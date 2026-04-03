@@ -20,7 +20,7 @@ export default function PlaylistPage() {
             </Typography>
             <Typography variant="h1" className="text-white drop-shadow-md text-4xl md:text-6xl font-bold">Midnight Synthwave Study</Typography>
             <Typography variant="body" className="text-white/80 max-w-2xl">
-              Danh sách nhạc lofi tổng hợp dựa trên yêu cầu: "Giai điệu chậm rải, không lời, phong cách cyberpunk ban đêm".
+              Danh sách nhạc lofi tổng hợp dựa trên yêu cầu: &quot;Giai điệu chậm rải, không lời, phong cách cyberpunk ban đêm&quot;.
             </Typography>
             <div className="flex items-center gap-2">
               <Typography variant="caption" className="font-semibold">MelodyMix AI</Typography>
