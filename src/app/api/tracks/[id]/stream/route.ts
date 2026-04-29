@@ -86,7 +86,7 @@ export async function GET(
     const responseHeaders = new Headers();
     responseHeaders.set("Content-Type", upstream.headers.get("Content-Type") ?? "audio/mpeg");
     responseHeaders.set("Accept-Ranges", "bytes");
-    responseHeaders.set("Cache-Control", "public, max-age=3600");
+    responseHeaders.set("Cache-Control", "private, max-age=3600");
 
     const contentLength = upstream.headers.get("Content-Length");
     if (contentLength) responseHeaders.set("Content-Length", contentLength);
