@@ -32,7 +32,7 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
       if (
         route.path === "/api/tracks" &&
         pathname.startsWith("/api/tracks/") &&
-        !pathname.includes("/stream")
+        !pathname.slice("/api/tracks/".length).includes("/")
       ) {
         return true;
       }
