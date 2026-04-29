@@ -58,14 +58,6 @@ export async function GET(
       );
     }
 
-    // --- Record the play ----------------------------------------------------
-    const userId = session.user.id;
-    if (userId) {
-      await prisma.recentPlay.create({
-        data: { userId, trackId: track.id },
-      });
-    }
-
     // --- Proxy the audio with Range support ---------------------------------
     const rangeHeader = request.headers.get("range");
     const upstreamHeaders: HeadersInit = {};
@@ -80,6 +72,15 @@ export async function GET(
         { error: "Failed to fetch audio from upstream" },
         { status: 502 }
       );
+    }
+
+    // Record play only on initial request (no Range header) and after
+    // confirming the upstream fetch succeeded.
+    const userId = session.user.id;
+    if (userId && !rangeHeader) {
+      await prisma.recentPlay.create({
+        data: { userId, trackId: track.id },
+      });
     }
 
     const responseHeaders = new Headers();

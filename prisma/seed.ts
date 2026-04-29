@@ -35,19 +35,51 @@ interface CsvRow {
   energy: string;
 }
 
+/** RFC 4180-aware CSV field splitter — handles quoted fields with commas. */
+function splitCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') {
+        current += '"';
+        i++; // skip escaped quote
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        fields.push(current.trim());
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
 function parseCsv(filePath: string): CsvRow[] {
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n").filter((l) => l.trim().length > 0);
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(",");
+  const headers = splitCsvLine(lines[0]);
   const rows: CsvRow[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(",");
+    const values = splitCsvLine(lines[i]);
     const row: Record<string, string> = {};
     for (let j = 0; j < headers.length; j++) {
-      row[headers[j].trim()] = (values[j] ?? "").trim();
+      row[headers[j]] = values[j] ?? "";
     }
     rows.push(row as unknown as CsvRow);
   }
