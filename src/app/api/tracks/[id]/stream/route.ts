@@ -78,9 +78,9 @@ export async function GET(
     // confirming the upstream fetch succeeded.
     const userId = session.user.id;
     if (userId && !rangeHeader) {
-      await prisma.recentPlay.create({
+      prisma.recentPlay.create({
         data: { userId, trackId: track.id },
-      });
+      }).catch(() => { /* play tracking is best-effort */ });
     }
 
     const responseHeaders = new Headers();

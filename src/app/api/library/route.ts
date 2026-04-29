@@ -83,6 +83,10 @@ export async function DELETE(request: Request) {
   try {
     const { trackId } = await request.json();
 
+    if (!trackId) {
+      return NextResponse.json({ error: "trackId is required" }, { status: 400 });
+    }
+
     await prisma.libraryItem.delete({
       where: { userId_trackId: { userId: session.user.id, trackId } },
     });

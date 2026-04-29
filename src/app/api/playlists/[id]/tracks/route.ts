@@ -70,6 +70,10 @@ export async function DELETE(
     const { id } = await params;
     const { trackId } = await request.json();
 
+    if (!trackId) {
+      return NextResponse.json({ error: "trackId is required" }, { status: 400 });
+    }
+
     const playlist = await prisma.playlist.findUnique({ where: { id } });
     if (!playlist) {
       return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
