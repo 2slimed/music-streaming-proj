@@ -130,6 +130,9 @@ async function main() {
       where: { trackId: row.track_id },
       update: {
         ...norms,
+        artists: row.artists,
+        albumName: row.album_name,
+        trackName: row.track_name,
         popularity,
         durationMs,
         explicit,
