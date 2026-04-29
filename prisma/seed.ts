@@ -10,6 +10,8 @@
  *   explicitNorm     = explicit ? 1.0 : 0.0
  *   danceabilityNorm = danceability                          (already 0-1)
  *   energyNorm       = energy                                (already 0-1)
+ *
+ * Preview URLs and cover art are resolved via the Deezer API (free, no key).
  */
 
 import "dotenv/config";
@@ -103,6 +105,36 @@ function normalize(t: {
   };
 }
 
+/** Resolve preview URL and cover art from Deezer (free, no API key). */
+async function resolveDeezer(
+  trackName: string,
+  artists: string,
+): Promise<{ previewUrl: string | null; coverUrl: string | null }> {
+  try {
+    const query = encodeURIComponent(`${artists} ${trackName}`);
+    const res = await fetch(
+      `https://api.deezer.com/search?q=${query}&limit=1`,
+    );
+    if (!res.ok) return { previewUrl: null, coverUrl: null };
+
+    const data = await res.json();
+    const hit = data?.data?.[0];
+    if (!hit) return { previewUrl: null, coverUrl: null };
+
+    return {
+      previewUrl: hit.preview || null,
+      coverUrl: hit.album?.cover_medium || hit.album?.cover || null,
+    };
+  } catch {
+    return { previewUrl: null, coverUrl: null };
+  }
+}
+
+/** Small delay to stay under Deezer's rate limits. */
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function main() {
   const csvPath = path.resolve(__dirname, "../data/dataset.csv");
 
@@ -115,6 +147,7 @@ async function main() {
   console.log(`Parsed ${rows.length} rows from CSV. Seeding...`);
 
   let seeded = 0;
+  let resolved = 0;
   for (const row of rows) {
     if (!row.track_id || !row.track_name) continue;
 
@@ -125,6 +158,10 @@ async function main() {
     const energy = parseFloat(row.energy) || 0;
 
     const norms = normalize({ popularity, durationMs, explicit, danceability, energy });
+
+    // Resolve preview URL and cover art from Deezer
+    const { previewUrl, coverUrl } = await resolveDeezer(row.track_name, row.artists);
+    if (previewUrl) resolved++;
 
     await prisma.track.upsert({
       where: { trackId: row.track_id },
@@ -138,6 +175,8 @@ async function main() {
         explicit,
         danceability,
         energy,
+        ...(previewUrl ? { previewUrl } : {}),
+        ...(coverUrl ? { coverUrl } : {}),
       },
       create: {
         trackId: row.track_id,
@@ -150,13 +189,21 @@ async function main() {
         danceability,
         energy,
         spotifyId: row.track_id,
+        previewUrl,
+        coverUrl,
         ...norms,
       },
     });
     seeded++;
+
+    // Rate-limit: ~50ms between Deezer API calls
+    if (seeded % 10 === 0) {
+      process.stdout.write(`\r  Seeded ${seeded}/${rows.length}...`);
+    }
+    await sleep(50);
   }
 
-  console.log(`Seeded ${seeded} tracks (with normalized vectors).`);
+  console.log(`\nSeeded ${seeded} tracks (${resolved} with Deezer previews).`);
 }
 
 main()

@@ -6,13 +6,13 @@ import { auth } from "@/lib/auth";
 /**
  * GET /api/tracks/:id/stream
  *
- * Proxies the Spotify 30-second preview through our server so that:
+ * Proxies a 30-second preview through our server so that:
  *   1. The real preview URL is never exposed to the client.
  *   2. We can enforce authentication.
  *   3. HTTP Range requests are supported for seeking.
  *
  * Flow:
- *   - Resolve track → get previewUrl (or fetch from Spotify API).
+ *   - Resolve track → get previewUrl (or fetch from Deezer API).
  *   - If the client sends a Range header, forward it upstream.
  *   - Return the audio bytes with correct Content-Range / 206 status.
  */
@@ -37,11 +37,11 @@ export async function GET(
       return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
 
-    // If no previewUrl stored yet, try to resolve via Spotify API
+    // If no previewUrl stored yet, try to resolve via Deezer API
     let previewUrl = track.previewUrl;
 
-    if (!previewUrl && track.spotifyId) {
-      previewUrl = await resolveSpotifyPreview(track.spotifyId);
+    if (!previewUrl) {
+      previewUrl = await resolveDeezerPreview(track.trackName, track.artists);
 
       if (previewUrl) {
         await prisma.track.update({
@@ -68,13 +68,13 @@ export async function GET(
     let upstream = await fetch(previewUrl, { headers: upstreamHeaders });
 
     // If the cached preview URL is stale (expired), invalidate and re-resolve
-    if (!upstream.ok && upstream.status !== 206 && track.spotifyId) {
+    if (!upstream.ok && upstream.status !== 206) {
       await prisma.track.update({
         where: { id: track.id },
         data: { previewUrl: null },
       });
 
-      const freshUrl = await resolveSpotifyPreview(track.spotifyId);
+      const freshUrl = await resolveDeezerPreview(track.trackName, track.artists);
       if (freshUrl) {
         await prisma.track.update({
           where: { id: track.id },
@@ -124,37 +124,24 @@ export async function GET(
 }
 
 // ---------------------------------------------------------------------------
-// Spotify preview URL resolver
+// Deezer preview URL resolver (free, no API key required)
 // ---------------------------------------------------------------------------
-async function resolveSpotifyPreview(spotifyId: string): Promise<string | null> {
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) return null;
-
+async function resolveDeezerPreview(
+  trackName: string,
+  artists: string,
+): Promise<string | null> {
   try {
-    // Client credentials flow
-    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-      },
-      body: "grant_type=client_credentials",
-    });
-
-    if (!tokenRes.ok) return null;
-    const { access_token } = await tokenRes.json();
-
-    const trackRes = await fetch(
-      `https://api.spotify.com/v1/tracks/${spotifyId}`,
-      { headers: { Authorization: `Bearer ${access_token}` } }
+    const query = encodeURIComponent(`${artists} ${trackName}`);
+    const res = await fetch(
+      `https://api.deezer.com/search?q=${query}&limit=1`,
     );
 
-    if (!trackRes.ok) return null;
-    const data = await trackRes.json();
+    if (!res.ok) return null;
 
-    return data.preview_url ?? null;
+    const data = await res.json();
+    const hit = data?.data?.[0];
+
+    return hit?.preview || null;
   } catch {
     return null;
   }

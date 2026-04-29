@@ -10,7 +10,7 @@ There is **no separate Express server** — every endpoint is a Route Handler (`
 | Runtime | Next.js 16 (App Router) |
 | ORM | Prisma 6 + PostgreSQL |
 | Auth | Auth.js v5 (NextAuth) — JWT strategy |
-| Streaming | Spotify Web API preview proxy |
+| Streaming | Deezer API preview proxy (free, no key) |
 
 ---
 
@@ -32,7 +32,7 @@ There is **no separate Express server** — every endpoint is a Route Handler (`
 
 ### Design decisions
 
-1. **Artists as strings, not a table.** The Kaggle dataset stores artist names as comma-separated text. A full many-to-many `Artist ↔ Track` model adds complexity without benefit in V1 because we don't host artist profiles — Spotify API provides that data.
+1. **Artists as strings, not a table.** The Kaggle dataset stores artist names as comma-separated text. A full many-to-many `Artist ↔ Track` model adds complexity without benefit in V1 because we don't host artist profiles.
 
 2. **User `role` enum (USER / ARTIST).** Keeps a single users table while allowing future artist-specific features (dashboard, analytics) behind a role check.
 
@@ -46,7 +46,7 @@ There is **no separate Express server** — every endpoint is a Route Handler (`
    | `danceabilityNorm` | identity (already 0-1) |
    | `energyNorm` | identity (already 0-1) |
 
-4. **No cloud storage for audio.** Audio is proxied from Spotify's 30-second previews through `/api/tracks/[id]/stream`.
+4. **No cloud storage for audio.** Audio is proxied from Deezer's free 30-second previews through `/api/tracks/[id]/stream`. No API key required.
 
 ### Indexes
 
@@ -95,7 +95,7 @@ JWT-based sessions (no database session table needed for auth checks — the Ses
 |--------|------|------|-------------|
 | GET | `/api/tracks` | No | List tracks. Query: `page`, `limit`, `sort`, `artist`, `album` |
 | GET | `/api/tracks/:id` | No | Single track detail |
-| GET | `/api/tracks/:id/stream` | **Yes** | Proxy Spotify preview audio (supports HTTP Range / 206) |
+| GET | `/api/tracks/:id/stream` | **Yes** | Proxy Deezer preview audio (supports HTTP Range / 206) |
 
 ### Playlists
 
@@ -142,7 +142,7 @@ Client  ──GET /api/tracks/:id/stream──►  Middleware (cookie check)
                                         Route Handler
                                         ├─ Verify session (auth())
                                         ├─ Resolve Track from DB
-                                        ├─ If no previewUrl → call Spotify API
+                                        ├─ If no previewUrl → call Deezer API
                                         ├─ Record RecentPlay
                                         └─ Proxy upstream audio
                                               │
@@ -153,13 +153,13 @@ Client  ──GET /api/tracks/:id/stream──►  Middleware (cookie check)
 
 ### Seeking support
 
-The handler forwards the client's `Range` header to Spotify and returns `206 Partial Content` with the correct `Content-Range`, enabling `<audio>` seeking.
+The handler forwards the client's `Range` header to Deezer and returns `206 Partial Content` with the correct `Content-Range`, enabling `<audio>` seeking.
 
 ### Security
 
 1. Middleware rejects unauthenticated requests before the handler runs.
 2. The handler double-checks via `auth()` (belt-and-suspenders).
-3. The real Spotify preview URL is never exposed to the client.
+3. The real Deezer preview URL is never exposed to the client.
 
 ---
 
@@ -183,8 +183,10 @@ See `.env.example` at the project root.
 | `AUTH_URL` | Yes | Canonical app URL |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
-| `SPOTIFY_CLIENT_ID` | No | Spotify app client ID (for previews) |
-| `SPOTIFY_CLIENT_SECRET` | No | Spotify app client secret |
+| `SPOTIFY_CLIENT_ID` | No | Spotify app client ID (legacy, not used for previews) |
+| `SPOTIFY_CLIENT_SECRET` | No | Spotify app client secret (legacy, not used for previews) |
+
+> **Note:** Audio previews now use the **Deezer API** (free, no API key required). The Spotify credentials are retained for potential future use (e.g., metadata enrichment) but are not needed for streaming.
 
 ---
 
