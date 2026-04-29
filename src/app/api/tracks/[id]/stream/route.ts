@@ -65,7 +65,24 @@ export async function GET(
       upstreamHeaders["Range"] = rangeHeader;
     }
 
-    const upstream = await fetch(previewUrl, { headers: upstreamHeaders });
+    let upstream = await fetch(previewUrl, { headers: upstreamHeaders });
+
+    // If the cached preview URL is stale (expired), invalidate and re-resolve
+    if (!upstream.ok && upstream.status !== 206 && track.spotifyId) {
+      await prisma.track.update({
+        where: { id: track.id },
+        data: { previewUrl: null },
+      });
+
+      const freshUrl = await resolveSpotifyPreview(track.spotifyId);
+      if (freshUrl) {
+        await prisma.track.update({
+          where: { id: track.id },
+          data: { previewUrl: freshUrl },
+        });
+        upstream = await fetch(freshUrl, { headers: upstreamHeaders });
+      }
+    }
 
     if (!upstream.ok && upstream.status !== 206) {
       return NextResponse.json(
