@@ -98,7 +98,15 @@ export async function DELETE(
     });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "P2025"
+    ) {
+      return NextResponse.json({ error: "Track not in playlist" }, { status: 404 });
+    }
     return NextResponse.json({ error: "Failed to remove track" }, { status: 500 });
   }
 }

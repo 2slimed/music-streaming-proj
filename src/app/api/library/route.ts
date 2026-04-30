@@ -92,7 +92,15 @@ export async function DELETE(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "P2025"
+    ) {
+      return NextResponse.json({ error: "Track not in library" }, { status: 404 });
+    }
     return NextResponse.json({ error: "Failed to remove from library" }, { status: 500 });
   }
 }
