@@ -56,6 +56,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "trackId is required" }, { status: 400 });
     }
 
+    const track = await prisma.track.findUnique({ where: { id: trackId } });
+    if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
+
     const item = await prisma.libraryItem.upsert({
       where: { userId_trackId: { userId: session.user.id, trackId } },
       update: {},
