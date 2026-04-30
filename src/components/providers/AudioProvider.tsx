@@ -75,7 +75,17 @@ export function AudioProvider() {
   }, [setDuration]);
 
   const onEnded = useCallback(() => {
-    nextTrack();
+    const state = usePlayerStore.getState();
+    if (state.repeat === "one") {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+      usePlayerStore.setState({ progress: 0 });
+    } else {
+      nextTrack();
+    }
   }, [nextTrack]);
 
   return (
