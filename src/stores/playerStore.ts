@@ -11,6 +11,7 @@ interface PlayerState {
   queueIndex: number;
   isPlaying: boolean;
   volume: number;
+  prevVolume: number;
   progress: number;
   duration: number;
   shuffle: boolean;
@@ -29,6 +30,7 @@ interface PlayerActions {
   setDuration: (seconds: number) => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
+  toggleMute: () => void;
   clearQueue: () => void;
 }
 
@@ -59,6 +61,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
   queueIndex: 0,
   isPlaying: false,
   volume: 0.7,
+  prevVolume: 0.7,
   progress: 0,
   duration: 0,
   shuffle: false,
@@ -91,9 +94,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
     if (queue.length === 0) return;
 
     let nextIndex: number;
-    if (repeat === "one") {
-      nextIndex = queueIndex;
-    } else if (shuffle) {
+    if (shuffle) {
       const { shufflePlayedIndices } = get();
       if (repeat === "off" && shufflePlayedIndices.size >= queue.length) {
         set({ isPlaying: false });
@@ -139,14 +140,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
       return;
     }
 
-    let prevIndex: number;
-    if (repeat === "one") {
-      prevIndex = queueIndex;
-    } else {
-      prevIndex = queueIndex - 1;
-      if (prevIndex < 0) {
-        prevIndex = repeat === "all" ? queue.length - 1 : 0;
-      }
+    let prevIndex = queueIndex - 1;
+    if (prevIndex < 0) {
+      prevIndex = repeat !== "off" ? queue.length - 1 : 0;
     }
 
     const prevTrack = queue[prevIndex];
@@ -161,6 +157,15 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
 
   seek: (seconds) => set({ progress: seconds }),
   setVolume: (volume) => set({ volume: Math.max(0, Math.min(1, volume)) }),
+
+  toggleMute: () => {
+    const { volume, prevVolume } = get();
+    if (volume > 0) {
+      set({ prevVolume: volume, volume: 0 });
+    } else {
+      set({ volume: prevVolume > 0 ? prevVolume : 0.7 });
+    }
+  },
   setProgress: (seconds) => set({ progress: seconds }),
   setDuration: (seconds) => set({ duration: seconds }),
 

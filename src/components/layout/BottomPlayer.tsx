@@ -42,6 +42,7 @@ export function BottomPlayer() {
   const setVolume = usePlayerStore((s) => s.setVolume);
   const toggleShuffle = usePlayerStore((s) => s.toggleShuffle);
   const toggleRepeat = usePlayerStore((s) => s.toggleRepeat);
+  const toggleMute = usePlayerStore((s) => s.toggleMute);
 
   const { data: session } = useSession();
   const isLiked = useLibraryStore((s) =>
@@ -202,7 +203,7 @@ export function BottomPlayer() {
           )}
           <div className="flex items-center gap-2 w-28">
             <button
-              onClick={() => setVolume(volume > 0 ? 0 : 0.7)}
+              onClick={toggleMute}
               className="text-muted hover:text-foreground transition-colors"
             >
               {volume === 0 ? (
