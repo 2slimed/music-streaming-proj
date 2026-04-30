@@ -15,6 +15,7 @@ interface PlayerState {
   duration: number;
   shuffle: boolean;
   repeat: RepeatMode;
+  shufflePlayedIndices: Set<number>;
 }
 
 interface PlayerActions {
@@ -50,17 +51,20 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
   duration: 0,
   shuffle: false,
   repeat: "off",
+  shufflePlayedIndices: new Set(),
 
   playTrack: (track, queue) => {
     const newQueue = queue ?? [track];
     const index = newQueue.findIndex((t) => t.id === track.id);
+    const startIndex = index >= 0 ? index : 0;
     set({
       currentTrack: track,
       queue: newQueue,
-      queueIndex: index >= 0 ? index : 0,
+      queueIndex: startIndex,
       isPlaying: true,
       progress: 0,
       duration: track.durationMs / 1000,
+      shufflePlayedIndices: new Set([startIndex]),
     });
   },
 
@@ -78,6 +82,14 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
     if (repeat === "one") {
       nextIndex = queueIndex;
     } else if (shuffle) {
+      const { shufflePlayedIndices } = get();
+      if (repeat === "off" && shufflePlayedIndices.size >= queue.length) {
+        set({ isPlaying: false });
+        return;
+      }
+      if (repeat === "all" && shufflePlayedIndices.size >= queue.length) {
+        set({ shufflePlayedIndices: new Set() });
+      }
       nextIndex = getShuffledIndex(queueIndex, queue.length);
     } else {
       nextIndex = queueIndex + 1;
@@ -92,12 +104,16 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
     }
 
     const nextTrack = queue[nextIndex];
+    const { shufflePlayedIndices } = get();
+    const newPlayed = new Set(shufflePlayedIndices);
+    newPlayed.add(nextIndex);
     set({
       currentTrack: nextTrack,
       queueIndex: nextIndex,
       isPlaying: true,
       progress: 0,
       duration: nextTrack.durationMs / 1000,
+      shufflePlayedIndices: newPlayed,
     });
   },
 
@@ -135,7 +151,11 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
   setProgress: (seconds) => set({ progress: seconds }),
   setDuration: (seconds) => set({ duration: seconds }),
 
-  toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
+  toggleShuffle: () =>
+    set((s) => ({
+      shuffle: !s.shuffle,
+      shufflePlayedIndices: new Set(s.shuffle ? [] : [s.queueIndex]),
+    })),
 
   toggleRepeat: () =>
     set((s) => {
