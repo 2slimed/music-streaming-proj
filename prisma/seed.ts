@@ -105,28 +105,29 @@ function normalize(t: {
   };
 }
 
-/** Resolve preview URL and cover art from Deezer (free, no API key). */
+/** Resolve preview URL, cover art, and Deezer track ID from Deezer (free, no API key). */
 async function resolveDeezer(
   trackName: string,
   artists: string,
-): Promise<{ previewUrl: string | null; coverUrl: string | null }> {
+): Promise<{ deezerId: string | null; previewUrl: string | null; coverUrl: string | null }> {
   try {
     const query = encodeURIComponent(`${artists} ${trackName}`);
     const res = await fetch(
       `https://api.deezer.com/search?q=${query}&limit=1`,
     );
-    if (!res.ok) return { previewUrl: null, coverUrl: null };
+    if (!res.ok) return { deezerId: null, previewUrl: null, coverUrl: null };
 
     const data = await res.json();
     const hit = data?.data?.[0];
-    if (!hit) return { previewUrl: null, coverUrl: null };
+    if (!hit) return { deezerId: null, previewUrl: null, coverUrl: null };
 
     return {
+      deezerId: hit.id ? String(hit.id) : null,
       previewUrl: hit.preview || null,
       coverUrl: hit.album?.cover_medium || hit.album?.cover || null,
     };
   } catch {
-    return { previewUrl: null, coverUrl: null };
+    return { deezerId: null, previewUrl: null, coverUrl: null };
   }
 }
 
@@ -159,8 +160,8 @@ async function main() {
 
     const norms = normalize({ popularity, durationMs, explicit, danceability, energy });
 
-    // Resolve preview URL and cover art from Deezer
-    const { previewUrl, coverUrl } = await resolveDeezer(row.track_name, row.artists);
+    // Resolve preview URL, cover art, and Deezer track ID from Deezer
+    const { deezerId, previewUrl, coverUrl } = await resolveDeezer(row.track_name, row.artists);
     if (previewUrl) resolved++;
 
     await prisma.track.upsert({
@@ -175,6 +176,7 @@ async function main() {
         explicit,
         danceability,
         energy,
+        ...(deezerId ? { externalId: deezerId } : {}),
         ...(previewUrl ? { previewUrl } : {}),
         ...(coverUrl ? { coverUrl } : {}),
       },
@@ -188,7 +190,7 @@ async function main() {
         explicit,
         danceability,
         energy,
-        externalId: row.track_id,
+        ...(deezerId ? { externalId: deezerId } : {}),
         previewUrl,
         coverUrl,
         ...norms,
