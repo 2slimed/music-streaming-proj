@@ -83,7 +83,7 @@ classDiagram
     }
     
     class Song {
-      +string spotifyId
+      +string externalId
       +string title
       +float duration
       +string coverUrl
