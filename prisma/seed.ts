@@ -105,28 +105,29 @@ function normalize(t: {
   };
 }
 
-/** Resolve preview URL and cover art from Deezer (free, no API key). */
+/** Resolve preview URL, cover art, and Deezer track ID from Deezer (free, no API key). */
 async function resolveDeezer(
   trackName: string,
   artists: string,
-): Promise<{ previewUrl: string | null; coverUrl: string | null }> {
+): Promise<{ deezerId: string | null; previewUrl: string | null; coverUrl: string | null }> {
   try {
     const query = encodeURIComponent(`${artists} ${trackName}`);
     const res = await fetch(
       `https://api.deezer.com/search?q=${query}&limit=1`,
     );
-    if (!res.ok) return { previewUrl: null, coverUrl: null };
+    if (!res.ok) return { deezerId: null, previewUrl: null, coverUrl: null };
 
     const data = await res.json();
     const hit = data?.data?.[0];
-    if (!hit) return { previewUrl: null, coverUrl: null };
+    if (!hit) return { deezerId: null, previewUrl: null, coverUrl: null };
 
     return {
+      deezerId: hit.id ? String(hit.id) : null,
       previewUrl: hit.preview || null,
       coverUrl: hit.album?.cover_medium || hit.album?.cover || null,
     };
   } catch {
-    return { previewUrl: null, coverUrl: null };
+    return { deezerId: null, previewUrl: null, coverUrl: null };
   }
 }
 
@@ -148,6 +149,16 @@ async function main() {
 
   let seeded = 0;
   let resolved = 0;
+  const seenDeezerIds = new Set<string>();
+  // Pre-populate with existing externalIds from DB to prevent collisions on re-seed
+  const existingExternalIds = await prisma.track.findMany({
+    where: { externalId: { not: null } },
+    select: { externalId: true },
+  });
+  for (const r of existingExternalIds) {
+    if (r.externalId) seenDeezerIds.add(r.externalId);
+  }
+
   for (const row of rows) {
     if (!row.track_id || !row.track_name) continue;
 
@@ -159,9 +170,13 @@ async function main() {
 
     const norms = normalize({ popularity, durationMs, explicit, danceability, energy });
 
-    // Resolve preview URL and cover art from Deezer
-    const { previewUrl, coverUrl } = await resolveDeezer(row.track_name, row.artists);
+    // Resolve preview URL, cover art, and Deezer track ID from Deezer
+    const { deezerId, previewUrl, coverUrl } = await resolveDeezer(row.track_name, row.artists);
     if (previewUrl) resolved++;
+
+    // Only use deezerId for externalId if it hasn't been seen before (unique constraint)
+    const uniqueDeezerId = deezerId && !seenDeezerIds.has(deezerId) ? deezerId : null;
+    if (uniqueDeezerId) seenDeezerIds.add(uniqueDeezerId);
 
     await prisma.track.upsert({
       where: { trackId: row.track_id },
@@ -175,6 +190,7 @@ async function main() {
         explicit,
         danceability,
         energy,
+        ...(uniqueDeezerId ? { externalId: uniqueDeezerId } : {}),
         ...(previewUrl ? { previewUrl } : {}),
         ...(coverUrl ? { coverUrl } : {}),
       },
@@ -188,7 +204,7 @@ async function main() {
         explicit,
         danceability,
         energy,
-        externalId: row.track_id,
+        ...(uniqueDeezerId ? { externalId: uniqueDeezerId } : {}),
         previewUrl,
         coverUrl,
         ...norms,
