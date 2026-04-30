@@ -38,18 +38,20 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const maxPosition = await prisma.playlistTrack.aggregate({
-      where: { playlistId: id },
-      _max: { position: true },
-    });
+    const entry = await prisma.$transaction(async (tx) => {
+      const maxPosition = await tx.playlistTrack.aggregate({
+        where: { playlistId: id },
+        _max: { position: true },
+      });
 
-    const entry = await prisma.playlistTrack.create({
-      data: {
-        playlistId: id,
-        trackId,
-        position: (maxPosition._max.position ?? -1) + 1,
-      },
-      include: { track: true },
+      return tx.playlistTrack.create({
+        data: {
+          playlistId: id,
+          trackId,
+          position: (maxPosition._max.position ?? -1) + 1,
+        },
+        include: { track: true },
+      });
     });
 
     return NextResponse.json(entry, { status: 201 });
