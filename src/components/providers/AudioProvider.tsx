@@ -84,7 +84,16 @@ export function AudioProvider() {
       }
       usePlayerStore.setState({ progress: 0 });
     } else {
+      const prevTrackId = state.currentTrack?.id;
       nextTrack();
+      const newState = usePlayerStore.getState();
+      if (newState.currentTrack?.id === prevTrackId && newState.isPlaying) {
+        const audio = audioRef.current;
+        if (audio) {
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
+        }
+      }
     }
   }, [nextTrack]);
 
