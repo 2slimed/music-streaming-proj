@@ -149,6 +149,7 @@ async function main() {
 
   let seeded = 0;
   let resolved = 0;
+  const seenDeezerIds = new Set<string>();
   for (const row of rows) {
     if (!row.track_id || !row.track_name) continue;
 
@@ -164,6 +165,10 @@ async function main() {
     const { deezerId, previewUrl, coverUrl } = await resolveDeezer(row.track_name, row.artists);
     if (previewUrl) resolved++;
 
+    // Only use deezerId for externalId if it hasn't been seen before (unique constraint)
+    const uniqueDeezerId = deezerId && !seenDeezerIds.has(deezerId) ? deezerId : null;
+    if (uniqueDeezerId) seenDeezerIds.add(uniqueDeezerId);
+
     await prisma.track.upsert({
       where: { trackId: row.track_id },
       update: {
@@ -176,7 +181,7 @@ async function main() {
         explicit,
         danceability,
         energy,
-        ...(deezerId ? { externalId: deezerId } : {}),
+        ...(uniqueDeezerId ? { externalId: uniqueDeezerId } : {}),
         ...(previewUrl ? { previewUrl } : {}),
         ...(coverUrl ? { coverUrl } : {}),
       },
@@ -190,7 +195,7 @@ async function main() {
         explicit,
         danceability,
         energy,
-        ...(deezerId ? { externalId: deezerId } : {}),
+        ...(uniqueDeezerId ? { externalId: uniqueDeezerId } : {}),
         previewUrl,
         coverUrl,
         ...norms,
