@@ -32,7 +32,19 @@ interface PlayerActions {
   clearQueue: () => void;
 }
 
-function getShuffledIndex(current: number, length: number): number {
+function getShuffledIndex(
+  current: number,
+  length: number,
+  playedIndices: Set<number>,
+): number {
+  const unplayed = [];
+  for (let i = 0; i < length; i++) {
+    if (i !== current && !playedIndices.has(i)) unplayed.push(i);
+  }
+  if (unplayed.length > 0) {
+    return unplayed[Math.floor(Math.random() * unplayed.length)];
+  }
+  // All played — pick any index other than current
   if (length <= 1) return 0;
   let next = current;
   while (next === current) {
@@ -90,7 +102,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
       if (repeat === "all" && shufflePlayedIndices.size >= queue.length) {
         set({ shufflePlayedIndices: new Set() });
       }
-      nextIndex = getShuffledIndex(queueIndex, queue.length);
+      const currentPlayed = get().shufflePlayedIndices;
+      nextIndex = getShuffledIndex(queueIndex, queue.length, currentPlayed);
     } else {
       nextIndex = queueIndex + 1;
       if (nextIndex >= queue.length) {
