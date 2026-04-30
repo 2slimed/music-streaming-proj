@@ -120,8 +120,8 @@ model Track {
   danceabilityNorm Float @default(0)
   energyNorm       Float @default(0)
 
-  // Spotify metadata (populated on-demand via Spotify API)
-  spotifyId    String? @unique
+  // External metadata (preview/cover resolved via Deezer API)
+  externalId   String? @unique
   previewUrl   String?
   coverUrl     String?
 

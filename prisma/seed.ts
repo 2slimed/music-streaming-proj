@@ -188,7 +188,7 @@ async function main() {
         explicit,
         danceability,
         energy,
-        spotifyId: row.track_id,
+        externalId: row.track_id,
         previewUrl,
         coverUrl,
         ...norms,
