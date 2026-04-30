@@ -24,6 +24,12 @@ export async function POST(
       return NextResponse.json({ error: "trackId is required" }, { status: 400 });
     }
 
+    // Verify track exists (trackId here is the internal cuid, NOT the Kaggle/external trackId field)
+    const track = await prisma.track.findUnique({ where: { id: trackId } });
+    if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
+
     const playlist = await prisma.playlist.findUnique({ where: { id } });
     if (!playlist) {
       return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
@@ -72,6 +78,11 @@ export async function DELETE(
 
     if (!trackId) {
       return NextResponse.json({ error: "trackId is required" }, { status: 400 });
+    }
+
+    const track = await prisma.track.findUnique({ where: { id: trackId } });
+    if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
 
     const playlist = await prisma.playlist.findUnique({ where: { id } });
