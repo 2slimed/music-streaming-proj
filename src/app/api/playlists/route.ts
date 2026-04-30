@@ -52,13 +52,13 @@ export async function POST(request: Request) {
   try {
     const { name, description, privacy } = await request.json();
 
-    if (!name) {
+    if (typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Playlist name is required" }, { status: 400 });
     }
 
     const playlist = await prisma.playlist.create({
       data: {
-        name,
+        name: name.trim(),
         description: description ?? null,
         privacy: privacy === "PUBLIC" ? "PUBLIC" : "PRIVATE",
         userId: session.user.id,

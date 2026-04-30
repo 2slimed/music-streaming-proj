@@ -67,8 +67,10 @@ export async function PATCH(
     const body = await request.json();
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) {
-      if (!body.name) return NextResponse.json({ error: "Playlist name cannot be empty" }, { status: 400 });
-      data.name = body.name;
+      if (typeof body.name !== "string" || !body.name.trim()) {
+        return NextResponse.json({ error: "Playlist name cannot be empty" }, { status: 400 });
+      }
+      data.name = body.name.trim();
     }
     if (body.description !== undefined) data.description = body.description;
     if (body.privacy !== undefined) data.privacy = body.privacy === "PUBLIC" ? "PUBLIC" : "PRIVATE";

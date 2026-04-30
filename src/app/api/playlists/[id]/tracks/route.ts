@@ -53,7 +53,15 @@ export async function POST(
     });
 
     return NextResponse.json(entry, { status: 201 });
-  } catch {
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "P2002"
+    ) {
+      return NextResponse.json({ error: "Track already in playlist" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Failed to add track to playlist" }, { status: 500 });
   }
 }
