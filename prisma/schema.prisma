@@ -150,6 +150,19 @@ model Album {
   @@index([name])
 }
 
+model Artist {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  bio       String?  @db.Text
+  imageUrl  String?
+  socials   String?  // JSON string: { "twitter": "...", "instagram": "..." }
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
 model Playlist {
   id          String          @id @default(cuid())
   name        String
