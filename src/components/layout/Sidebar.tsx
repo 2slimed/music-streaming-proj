@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
-import { PlayCircle, Library, Music2, Search, Plus } from "lucide-react";
+import { Bot, PlayCircle, Library, Music2, Search, Plus } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { api } from "@/lib/api";
 import type { Playlist } from "@/types/api";
@@ -63,6 +63,14 @@ export function Sidebar() {
             className={`w-full justify-start gap-3 ${isActive("/library") ? "bg-white/10" : ""}`}
           >
             <Library className="w-5 h-5 text-accent" /> Library
+          </Button>
+        </Link>
+        <Link href="/chatbot">
+          <Button
+            variant="ghost"
+            className={`w-full justify-start gap-3 ${isActive("/chatbot") ? "bg-white/10" : ""}`}
+          >
+            <Bot className="w-5 h-5 text-accent" /> Chatbot
           </Button>
         </Link>
 
