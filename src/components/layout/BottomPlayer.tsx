@@ -83,10 +83,10 @@ export function BottomPlayer() {
     <div className="fixed bottom-0 left-0 right-0 z-50 px-2 pb-2 md:px-6 md:pb-6 pointer-events-none">
       <GlassWindow
         intensity="medium"
-        className="pointer-events-auto h-20 md:h-24 w-full max-w-7xl mx-auto flex items-center justify-between px-4 md:px-8 border-t-0 md:rounded-2xl shadow-2xl"
+        className="pointer-events-auto h-20 md:h-24 w-full max-w-7xl mx-auto flex items-center justify-between gap-3 px-3 md:px-8 border-t-0 md:rounded-2xl shadow-2xl"
       >
         {/* Song Info */}
-        <div className="flex items-center gap-4 w-1/4 min-w-[200px]">
+        <div className="flex min-w-0 flex-1 items-center gap-3 md:w-1/4 md:min-w-[200px] md:gap-4">
           <div className="hidden md:block w-14 h-14 rounded-md bg-surface overflow-hidden shadow-md">
             {currentTrack?.coverUrl ? (
               <img
@@ -100,10 +100,10 @@ export function BottomPlayer() {
               </div>
             )}
           </div>
-          <div className="flex flex-col min-w-0">
+          <div className="flex min-w-0 flex-col max-md:rounded-xl max-md:border max-md:border-white/10 max-md:bg-background/70 max-md:px-3 max-md:py-2 max-md:shadow-[0_12px_28px_rgba(0,0,0,0.35)] max-md:backdrop-blur-md">
             <Typography
               variant="caption"
-              className="font-semibold line-clamp-1 text-base"
+              className="line-clamp-1 text-base font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
             >
               {currentTrack?.trackName ?? "Not Playing"}
             </Typography>
@@ -111,7 +111,7 @@ export function BottomPlayer() {
               <Typography
                 variant="caption"
                 color="muted"
-                className="text-xs line-clamp-1"
+                className="line-clamp-1 text-xs text-foreground/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
               >
                 {currentTrack.artists}
               </Typography>
@@ -120,8 +120,8 @@ export function BottomPlayer() {
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col items-center justify-center flex-1 max-w-2xl px-4">
-          <div className="flex items-center gap-4 md:gap-6">
+        <div className="flex flex-none flex-col items-center justify-center px-0 md:flex-1 md:max-w-2xl md:px-4">
+          <div className="flex items-center gap-2 md:gap-6">
             <Button
               variant="ghost"
               size="icon"
@@ -132,23 +132,23 @@ export function BottomPlayer() {
                 className={`w-4 h-4 ${shuffle ? "text-accent" : "text-muted hover:text-foreground"}`}
               />
             </Button>
-            <Button variant="ghost" size="icon" onClick={prevTrack}>
-              <SkipBack className="w-6 h-6 fill-foreground" />
+            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={prevTrack}>
+              <SkipBack className="h-5 w-5 fill-foreground md:h-6 md:w-6" />
             </Button>
             <Button
               variant="default"
               size="icon"
-              className="w-12 h-12 bg-foreground text-background hover:bg-foreground/90 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+              className="h-11 w-11 bg-foreground text-background hover:bg-foreground/90 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.2)] md:h-12 md:w-12"
               onClick={togglePlay}
             >
               {isPlaying ? (
-                <Pause className="w-6 h-6 fill-current" />
+                <Pause className="h-5 w-5 fill-current md:h-6 md:w-6" />
               ) : (
-                <Play className="w-6 h-6 ml-1 fill-current" />
+                <Play className="ml-0.5 h-5 w-5 fill-current md:ml-1 md:h-6 md:w-6" />
               )}
             </Button>
-            <Button variant="ghost" size="icon" onClick={nextTrack}>
-              <SkipForward className="w-6 h-6 fill-foreground" />
+            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={nextTrack}>
+              <SkipForward className="h-5 w-5 fill-foreground md:h-6 md:w-6" />
             </Button>
             <Button
               variant="ghost"

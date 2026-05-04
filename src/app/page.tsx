@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Typography } from "@/components/ui/Typography";
 import { TrackGrid } from "@/components/ui/TrackGrid";
 import { TrackListItem } from "@/components/ui/TrackListItem";
-import { Play, Music2, Menu } from "lucide-react";
+import { Play } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { api } from "@/lib/api";
 
@@ -42,16 +42,6 @@ export default function HomePage() {
 
   return (
     <div className="w-full">
-      {/* Mobile Header */}
-      <header className="md:hidden flex items-center justify-between p-4 sticky top-0 bg-background/80 backdrop-blur-md z-10 border-b border-white/5">
-        <Typography variant="h4" className="flex items-center gap-2">
-          <Music2 className="w-6 h-6 text-accent" /> MelodyMix
-        </Typography>
-        <Button variant="ghost" size="icon">
-          <Menu className="w-6 h-6" />
-        </Button>
-      </header>
-
       <div className="p-6 md:p-10 space-y-12">
         {/* Top Hero Banner */}
         <section>
