@@ -12,6 +12,10 @@
  *   energyNorm       = energy                                (already 0-1)
  *
  * Preview URLs and cover art are resolved via the Deezer API (free, no key).
+ *
+ * Phase 2: After tracks are seeded, unique artist names are extracted and
+ * queried against Deezer's /search/artist endpoint to populate the Artist
+ * table with images and metadata.
  */
 
 import "dotenv/config";
@@ -220,6 +224,102 @@ async function main() {
   }
 
   console.log(`\nSeeded ${seeded} tracks (${resolved} with Deezer previews).`);
+
+  // ---- Phase 2: Seed Artist table from Deezer ----------------------------
+  await seedArtists();
+}
+
+/** Search Deezer for an artist by name and return metadata. */
+async function resolveDeezerArtist(
+  name: string,
+): Promise<{
+  deezerArtistId: string | null;
+  imageUrl: string | null;
+  nbFan: number | null;
+  nbAlbum: number | null;
+}> {
+  try {
+    const query = encodeURIComponent(name);
+    const res = await fetch(
+      `https://api.deezer.com/search/artist?q=${query}&limit=1`,
+    );
+    if (!res.ok) return { deezerArtistId: null, imageUrl: null, nbFan: null, nbAlbum: null };
+
+    const data = await res.json();
+    const hit = data?.data?.[0];
+    if (!hit) return { deezerArtistId: null, imageUrl: null, nbFan: null, nbAlbum: null };
+
+    return {
+      deezerArtistId: hit.id ? String(hit.id) : null,
+      imageUrl: hit.picture_big || hit.picture_medium || hit.picture || null,
+      nbFan: hit.nb_fan ?? null,
+      nbAlbum: hit.nb_album ?? null,
+    };
+  } catch {
+    return { deezerArtistId: null, imageUrl: null, nbFan: null, nbAlbum: null };
+  }
+}
+
+/** Extract unique artist names from all seeded tracks and populate the Artist table. */
+async function seedArtists() {
+  const tracks = await prisma.track.findMany({ select: { artists: true } });
+
+  const artistNames = new Set<string>();
+  for (const t of tracks) {
+    for (const name of t.artists.split(";")) {
+      const trimmed = name.trim();
+      if (trimmed) artistNames.add(trimmed);
+    }
+  }
+
+  console.log(`\nFound ${artistNames.size} unique artists. Seeding artist metadata...`);
+
+  let seeded = 0;
+  const seenDeezerArtistIds = new Set<string>();
+  // Pre-populate from DB to avoid unique constraint violations on re-seed
+  const existingArtists = await prisma.artist.findMany({
+    where: { deezerArtistId: { not: null } },
+    select: { deezerArtistId: true },
+  });
+  for (const a of existingArtists) {
+    if (a.deezerArtistId) seenDeezerArtistIds.add(a.deezerArtistId);
+  }
+
+  for (const name of artistNames) {
+    const { deezerArtistId, imageUrl, nbFan, nbAlbum } =
+      await resolveDeezerArtist(name);
+
+    const uniqueDeezerId =
+      deezerArtistId && !seenDeezerArtistIds.has(deezerArtistId)
+        ? deezerArtistId
+        : null;
+    if (uniqueDeezerId) seenDeezerArtistIds.add(uniqueDeezerId);
+
+    await prisma.artist.upsert({
+      where: { name },
+      update: {
+        ...(imageUrl ? { imageUrl } : {}),
+        ...(uniqueDeezerId ? { deezerArtistId: uniqueDeezerId } : {}),
+        ...(nbFan != null ? { nbFan } : {}),
+        ...(nbAlbum != null ? { nbAlbum } : {}),
+      },
+      create: {
+        name,
+        imageUrl,
+        deezerArtistId: uniqueDeezerId,
+        nbFan,
+        nbAlbum,
+      },
+    });
+
+    seeded++;
+    if (seeded % 10 === 0) {
+      process.stdout.write(`\r  Seeded ${seeded}/${artistNames.size} artists...`);
+    }
+    await sleep(50);
+  }
+
+  console.log(`\nSeeded ${seeded} artists.`);
 }
 
 main()

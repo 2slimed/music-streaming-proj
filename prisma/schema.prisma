@@ -2,9 +2,9 @@
 // MelodyMix – Prisma Schema  (PostgreSQL)
 // ---------------------------------------------------------------------------
 // Architectural decisions
-//   * Artists are NOT a separate table. The Track model stores `artists` as a
-//     plain string (comma-separated) mirroring the Kaggle Spotify dataset.
-//     A full many-to-many Artist <-> Track relation is out of scope for V1.
+//   * The Track model stores `artists` as a plain string (semicolon-separated)
+//     mirroring the Kaggle Spotify dataset. The Artist table stores metadata
+//     (image, bio) and is loosely coupled via name matching.
 //   * The User model carries a `role` enum so the same table can represent
 //     both regular listeners and artist profiles in the future.
 //   * Tracks are sourced from the Kaggle dataset and enriched at runtime
@@ -97,7 +97,7 @@ model User {
 model Track {
   id           String  @id @default(cuid())
   trackId      String  @unique // original Spotify / dataset track_id
-  artists      String  // comma-separated artist names from dataset
+  artists      String  // semicolon-separated artist names from dataset
   albumName    String
   trackName    String
 
@@ -148,6 +148,19 @@ model Album {
   createdAt DateTime @default(now())
 
   @@index([name])
+}
+
+model Artist {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  bio            String?  @db.Text
+  imageUrl       String?
+  deezerArtistId String?  @unique
+  nbFan          Int?
+  nbAlbum        Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Playlist {

@@ -9,6 +9,6 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env["DATABASE_URL"] ?? "postgresql://melodymix_user:melodymix_pass@localhost:5433/melodymix?schema=public",
   },
 });
