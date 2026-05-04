@@ -92,6 +92,21 @@ CREATE TABLE "Album" (
 );
 
 -- CreateTable
+CREATE TABLE "Artist" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "bio" TEXT,
+    "imageUrl" TEXT,
+    "deezerArtistId" TEXT,
+    "nbFan" INTEGER,
+    "nbAlbum" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Artist_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Playlist" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -181,6 +196,12 @@ CREATE INDEX "Track_popularity_idx" ON "Track"("popularity");
 
 -- CreateIndex
 CREATE INDEX "Album_name_idx" ON "Album"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Artist_name_key" ON "Artist"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Artist_deezerArtistId_key" ON "Artist"("deezerArtistId");
 
 -- CreateIndex
 CREATE INDEX "Playlist_userId_idx" ON "Playlist"("userId");
