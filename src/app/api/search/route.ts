@@ -3,8 +3,8 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 /**
- * GET /api/search?q=<query>&type=tracks|playlists|all
- * Full-text-style search across tracks & public playlists.
+ * GET /api/search?q=<query>&type=tracks|albums|artists|playlists|all
+ * Full-text-style search across tracks, albums, artists & public playlists.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +29,29 @@ export async function GET(request: NextRequest) {
           ],
         },
         orderBy: { popularity: "desc" },
+        take: limit,
+      });
+    }
+
+    if (type === "all" || type === "albums") {
+      results.albums = await prisma.album.findMany({
+        where: {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { artists: { contains: q, mode: "insensitive" } },
+          ],
+        },
+        orderBy: { name: "asc" },
+        take: limit,
+      });
+    }
+
+    if (type === "all" || type === "artists") {
+      results.artists = await prisma.artist.findMany({
+        where: {
+          name: { contains: q, mode: "insensitive" },
+        },
+        orderBy: { nbFan: { sort: "desc", nulls: "last" } },
         take: limit,
       });
     }

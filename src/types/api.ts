@@ -108,5 +108,7 @@ export interface Artist {
 
 export interface SearchResults {
   tracks?: Track[];
+  albums?: Album[];
+  artists?: Artist[];
   playlists?: Playlist[];
 }

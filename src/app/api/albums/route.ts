@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
  * Query params:
  *   page  - page number (default 1)
  *   limit - items per page (default 20, max 100)
- *   sort  - "popular" | "recent" | "name" (default "popular")
+ *   sort  - "recent" | "name" (default "name")
  */
 export async function GET(request: NextRequest) {
   try {
@@ -17,14 +17,12 @@ export async function GET(request: NextRequest) {
 
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 20));
-    const sort = searchParams.get("sort") ?? "popular";
+    const sort = searchParams.get("sort") ?? "name";
 
     const orderBy =
-      sort === "name"
-        ? { name: "asc" as const }
-        : sort === "recent"
-          ? { createdAt: "desc" as const }
-          : { createdAt: "desc" as const };
+      sort === "recent"
+        ? { createdAt: "desc" as const }
+        : { name: "asc" as const };
 
     const [albums, total] = await Promise.all([
       prisma.album.findMany({
