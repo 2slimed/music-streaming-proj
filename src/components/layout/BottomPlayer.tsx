@@ -19,6 +19,7 @@ import {
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return "0:00";
@@ -101,20 +102,33 @@ export function BottomPlayer() {
             )}
           </div>
           <div className="flex min-w-0 flex-col max-md:rounded-xl max-md:border max-md:border-white/10 max-md:bg-background/70 max-md:px-3 max-md:py-2 max-md:shadow-[0_12px_28px_rgba(0,0,0,0.35)] max-md:backdrop-blur-md">
-            <Typography
-              variant="caption"
-              className="line-clamp-1 text-base font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-            >
-              {currentTrack?.trackName ?? "Not Playing"}
-            </Typography>
-            {currentTrack && (
+            {currentTrack ? (
+              <Link href={`/album/${encodeURIComponent(currentTrack.albumName)}`} className="hover:underline">
+                <Typography
+                  variant="caption"
+                  className="line-clamp-1 text-base font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                >
+                  {currentTrack.trackName}
+                </Typography>
+              </Link>
+            ) : (
               <Typography
                 variant="caption"
-                color="muted"
-                className="line-clamp-1 text-xs text-foreground/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
+                className="line-clamp-1 text-base font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               >
-                {currentTrack.artists}
+                Not Playing
               </Typography>
+            )}
+            {currentTrack && (
+              <Link href={`/artist/${encodeURIComponent(currentTrack.artists)}`} className="hover:underline">
+                <Typography
+                  variant="caption"
+                  color="muted"
+                  className="line-clamp-1 text-xs text-foreground/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
+                >
+                  {currentTrack.artists}
+                </Typography>
+              </Link>
             )}
           </div>
         </div>

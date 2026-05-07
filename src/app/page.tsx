@@ -1,42 +1,44 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
 import { Typography } from "@/components/ui/Typography";
-import { TrackGrid } from "@/components/ui/TrackGrid";
-import { TrackListItem } from "@/components/ui/TrackListItem";
+import { AlbumGrid } from "@/components/ui/AlbumGrid";
 import { Play } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { api } from "@/lib/api";
+import Link from "next/link";
+import type { Artist } from "@/types/api";
 
 export default function HomePage() {
-  const { data: session } = useSession();
   const playTrack = usePlayerStore((s) => s.playTrack);
 
-  const { data: popularData, isLoading: loadingPopular } = useQuery({
-    queryKey: ["tracks", "popular"],
-    queryFn: () => api.tracks.list({ sort: "popularity", limit: 12 }),
+  const { data: albumsData, isLoading: loadingAlbums } = useQuery({
+    queryKey: ["albums", "popular"],
+    queryFn: () => api.albums.list({ limit: 12 }),
   });
 
-  const { data: recentData } = useQuery({
-    queryKey: ["recent-plays"],
-    queryFn: () => api.profile.recentPlays(10),
-    enabled: !!session?.user,
+  const { data: artistsData } = useQuery({
+    queryKey: ["artists", "discover"],
+    queryFn: () => api.artists.list({ limit: 10 }),
   });
 
-  const { data: newData } = useQuery({
-    queryKey: ["tracks", "recent"],
-    queryFn: () => api.tracks.list({ sort: "recent", limit: 6 }),
+  const { data: newAlbumsData } = useQuery({
+    queryKey: ["albums", "recent"],
+    queryFn: () => api.albums.list({ sort: "recent", limit: 6 }),
   });
 
-  const popularTracks = popularData?.data ?? [];
-  const recentTracks = recentData?.data.map((rp) => rp.track) ?? [];
-  const newTracks = newData?.data ?? [];
+  const albums = albumsData?.data ?? [];
+  const artists = artistsData?.data ?? [];
+  const newAlbums = newAlbumsData?.data ?? [];
 
   function handlePlayHero() {
-    if (popularTracks.length > 0) {
-      playTrack(popularTracks[0], popularTracks);
+    if (albums.length > 0) {
+      api.tracks.list({ album: albums[0].name, limit: 50 }).then((res) => {
+        if (res.data.length > 0) {
+          playTrack(res.data[0], res.data);
+        }
+      });
     }
   }
 
@@ -76,13 +78,13 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Section: Listen Now (Popular Tracks) */}
+        {/* Section: Albums */}
         <section className="space-y-6">
           <div className="flex items-end justify-between">
             <Typography variant="h2">Listen Now</Typography>
           </div>
 
-          {loadingPopular ? (
+          {loadingAlbums ? (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="space-y-3">
@@ -93,34 +95,58 @@ export default function HomePage() {
               ))}
             </div>
           ) : (
-            <TrackGrid tracks={popularTracks.slice(0, 6)} />
+            <AlbumGrid albums={albums.slice(0, 6)} />
           )}
         </section>
 
-        {/* Recently Played */}
-        {recentTracks.length > 0 && (
+        {/* Discover Artists */}
+        {artists.length > 0 && (
           <section className="space-y-6">
-            <Typography variant="h2">Recently Played</Typography>
-            <div className="space-y-1">
-              {recentTracks.slice(0, 5).map((track, i) => (
-                <TrackListItem
-                  key={`${track.id}-${i}`}
-                  track={track}
-                  index={i}
-                  queue={recentTracks}
-                  showAlbum
-                  showCover
-                />
+            <Typography variant="h2">Discover Artists</Typography>
+            <div className="flex gap-6 overflow-x-auto pb-2 scrollbar-hide">
+              {artists.map((artist: Artist) => (
+                <Link
+                  href={`/artist/${encodeURIComponent(artist.name)}`}
+                  key={artist.id}
+                  className="flex flex-col items-center gap-3 shrink-0 group"
+                >
+                  <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden shadow-lg bg-surface hover:shadow-xl transition-shadow">
+                    {artist.imageUrl ? (
+                      <img
+                        src={artist.imageUrl}
+                        alt={artist.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20" />
+                    )}
+                  </div>
+                  <div className="text-center max-w-[7rem] md:max-w-[9rem]">
+                    <Typography
+                      variant="caption"
+                      className="block truncate font-semibold group-hover:text-accent transition-colors"
+                    >
+                      {artist.name}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="muted"
+                      className="block truncate text-xs"
+                    >
+                      Artist
+                    </Typography>
+                  </div>
+                </Link>
               ))}
             </div>
           </section>
         )}
 
         {/* New Releases */}
-        {newTracks.length > 0 && (
+        {newAlbums.length > 0 && (
           <section className="space-y-6">
             <Typography variant="h2">New Releases</Typography>
-            <TrackGrid tracks={newTracks} />
+            <AlbumGrid albums={newAlbums} />
           </section>
         )}
       </div>
