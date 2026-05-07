@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         ? { name: "asc" as const }
         : sort === "recent"
           ? { createdAt: "desc" as const }
-          : { name: "asc" as const };
+          : { createdAt: "desc" as const };
 
     const [albums, total] = await Promise.all([
       prisma.album.findMany({

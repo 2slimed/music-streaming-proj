@@ -120,15 +120,19 @@ export function BottomPlayer() {
               </Typography>
             )}
             {currentTrack && (
-              <Link href={`/artist/${encodeURIComponent(currentTrack.artists)}`} className="hover:underline">
-                <Typography
-                  variant="caption"
-                  color="muted"
-                  className="line-clamp-1 text-xs text-foreground/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
-                >
-                  {currentTrack.artists}
-                </Typography>
-              </Link>
+              <span className="line-clamp-1 text-xs text-foreground/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+                {currentTrack.artists.split(";").map((artist, i, arr) => (
+                  <span key={artist.trim()}>
+                    <Link
+                      href={`/artist/${encodeURIComponent(artist.trim())}`}
+                      className="hover:underline"
+                    >
+                      {artist.trim()}
+                    </Link>
+                    {i < arr.length - 1 && ", "}
+                  </span>
+                ))}
+              </span>
             )}
           </div>
         </div>
