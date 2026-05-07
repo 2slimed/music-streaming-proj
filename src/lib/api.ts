@@ -1,10 +1,11 @@
 import type {
   Track,
+  Album,
+  Artist,
   Playlist,
   PlaylistWithTracks,
   LibraryItem,
   UserProfile,
-  RecentPlay,
   PaginatedResponse,
   SearchResults,
 } from "@/types/api";
@@ -132,6 +133,22 @@ export const api = {
     },
   },
 
+  albums: {
+    list(params?: { page?: number; limit?: number; sort?: string }) {
+      return apiFetch<PaginatedResponse<Album>>(
+        `/api/albums${qs(params ?? {})}`,
+      );
+    },
+  },
+
+  artists: {
+    list(params?: { page?: number; limit?: number }) {
+      return apiFetch<PaginatedResponse<Artist>>(
+        `/api/artists${qs(params ?? {})}`,
+      );
+    },
+  },
+
   search(query: string, type?: string, limit?: number) {
     return apiFetch<SearchResults>(
       `/api/search${qs({ q: query, type, limit })}`,
@@ -147,11 +164,6 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(body),
       });
-    },
-    recentPlays(limit?: number) {
-      return apiFetch<{ data: RecentPlay[] }>(
-        `/api/profile/recent-plays${qs({ limit })}`,
-      );
     },
   },
 

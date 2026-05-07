@@ -26,8 +26,6 @@ export async function GET() {
           select: {
             playlists: true,
             libraryItems: true,
-            follows: true,
-            followers: true,
           },
         },
       },

@@ -89,9 +89,6 @@ model User {
   sessions     Session[]
   playlists    Playlist[]
   libraryItems LibraryItem[]
-  recentPlays  RecentPlay[]
-  follows      UserFollows[] @relation("follower")
-  followers    UserFollows[] @relation("following")
 }
 
 model Track {
@@ -131,7 +128,6 @@ model Track {
   // Relations
   playlistTracks PlaylistTrack[]
   libraryItems   LibraryItem[]
-  recentPlays    RecentPlay[]
 
   @@index([trackName])
   @@index([artists])
@@ -196,20 +192,6 @@ model PlaylistTrack {
   @@index([playlistId])
 }
 
-model UserFollows {
-  id          String @id @default(cuid())
-  followerId  String
-  followingId String
-
-  createdAt DateTime @default(now())
-
-  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
-}
 
 model LibraryItem {
   id      String @id @default(cuid())
@@ -222,19 +204,5 @@ model LibraryItem {
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
-  @@index([userId])
-}
-
-model RecentPlay {
-  id      String @id @default(cuid())
-  userId  String
-  trackId String
-
-  playedAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
-
-  @@index([userId, playedAt(sort: Desc)])
   @@index([userId])
 }

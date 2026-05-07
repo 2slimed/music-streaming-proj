@@ -1,4 +1,4 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -93,19 +93,6 @@ export async function GET(
       );
     }
 
-    // Record play only on initial request (no Range header) and after
-    // confirming the upstream fetch succeeded. Using after() ensures the
-    // DB write completes even in serverless/edge environments.
-    const userId = session.user.id;
-    if (userId && !rangeHeader) {
-      after(async () => {
-        try {
-          await prisma.recentPlay.create({
-            data: { userId, trackId: track.id },
-          });
-        } catch { /* play tracking is best-effort */ }
-      });
-    }
 
     const responseHeaders = new Headers();
     responseHeaders.set("Content-Type", upstream.headers.get("Content-Type") ?? "audio/mpeg");
