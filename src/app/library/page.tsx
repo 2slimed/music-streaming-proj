@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { TrackListItem } from "@/components/ui/TrackListItem";
+import { ScrollRow } from "@/components/ui/ScrollRow";
 import { Play, Plus, Heart } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { api } from "@/lib/api";
@@ -45,6 +46,13 @@ export default function LibraryPage() {
     },
   });
 
+  // Redirect to login if not authenticated (side effect, not during render)
+  useEffect(() => {
+    if (status !== "loading" && !session?.user) {
+      router.push("/login");
+    }
+  }, [status, session?.user, router]);
+
   if (status === "loading") {
     return (
       <div className="p-6 md:p-10 space-y-8">
@@ -59,7 +67,6 @@ export default function LibraryPage() {
   }
 
   if (!session?.user) {
-    router.push("/login");
     return null;
   }
 
@@ -122,26 +129,29 @@ export default function LibraryPage() {
 
       <div className="space-y-6">
         <Typography variant="h3">Playlists & Saved</Typography>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        <ScrollRow>
           {/* Liked Songs Card */}
           <div
-            className="aspect-square rounded-xl bg-gradient-to-br from-indigo-500 to-accent shadow-lg flex flex-col justify-end p-4 cursor-pointer hover:scale-[1.02] transition-transform"
+            className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] rounded-xl shadow-lg cursor-pointer hover:scale-[1.02] transition-transform aspect-square relative overflow-hidden"
             onClick={handlePlayLiked}
           >
-            <Heart className="w-8 h-8 text-white mb-2 fill-white" />
-            <Typography variant="h3" className="text-white drop-shadow-md">
-              Liked Songs
-            </Typography>
-            <Typography variant="caption" className="text-white/80">
-              {libraryData?.meta.total ?? 0} songs
-            </Typography>
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-accent" />
+            <div className="absolute inset-0 flex flex-col justify-end p-4">
+              <Heart className="w-8 h-8 text-white mb-2 fill-white" />
+              <Typography variant="h3" className="text-white drop-shadow-md">
+                Liked Songs
+              </Typography>
+              <Typography variant="caption" className="text-white/80">
+                {libraryData?.meta.total ?? 0} songs
+              </Typography>
+            </div>
           </div>
 
           {userPlaylists.map((playlist: Playlist) => (
             <Link
               href={`/playlist/${playlist.id}`}
               key={playlist.id}
-              className="space-y-3 cursor-pointer group"
+              className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-3 cursor-pointer group"
             >
               <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
                 {playlist.coverUrl ? (
@@ -185,12 +195,12 @@ export default function LibraryPage() {
 
           {loadingPlaylists &&
             Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="space-y-3">
+              <div key={i} className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-3">
                 <div className="aspect-square rounded-xl bg-surface animate-pulse" />
                 <div className="h-4 bg-surface rounded animate-pulse w-3/4" />
               </div>
             ))}
-        </div>
+        </ScrollRow>
       </div>
 
       {/* Liked Songs Track List */}

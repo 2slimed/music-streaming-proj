@@ -75,17 +75,15 @@ export function Sidebar() {
               <Link
                 href={`/playlist/${playlist.id}`}
                 key={playlist.id}
-                className="w-full block"
+                className="w-full block overflow-hidden"
                 onClick={() => setIsMobileOpen(false)}
               >
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start text-muted truncate ${
+                <span className={`block w-full truncate py-2.5 px-4 rounded-full text-sm font-medium text-muted hover:bg-surface-hover hover:text-foreground transition-colors ${
                     pathname === `/playlist/${playlist.id}` ? "bg-white/10 text-foreground" : ""
                   }`}
                 >
                   {playlist.name}
-                </Button>
+                </span>
               </Link>
             ))}
             {userPlaylists?.length === 0 && (

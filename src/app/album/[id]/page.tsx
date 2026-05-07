@@ -1,12 +1,13 @@
 "use client";
 
-import { use } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { use, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { TrackListItem } from "@/components/ui/TrackListItem";
-import { Play, Heart, MoreHorizontal, Clock } from "lucide-react";
+import { Play, BookmarkPlus, Clock } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
 export default function AlbumPage({
@@ -15,7 +16,9 @@ export default function AlbumPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const playTrack = usePlayerStore((s) => s.playTrack);
+  const queryClient = useQueryClient();
 
   const albumName = decodeURIComponent(id);
 
@@ -23,6 +26,8 @@ export default function AlbumPage({
     queryKey: ["album-tracks", albumName],
     queryFn: () => api.tracks.list({ album: albumName, limit: 50 }),
   });
+
+  const [saving, setSaving] = useState(false);
 
   const tracks = tracksData?.data ?? [];
   const firstTrack = tracks[0];
@@ -35,6 +40,25 @@ export default function AlbumPage({
   function handlePlayAll() {
     if (tracks.length > 0) {
       playTrack(tracks[0], tracks);
+    }
+  }
+
+  async function handleSave() {
+    if (tracks.length === 0 || saving) return;
+    setSaving(true);
+    try {
+      const playlist = await api.playlists.create({
+        name: albumName,
+        description: `Tracks from ${albumName} by ${artist}`,
+        coverUrl: coverUrl ?? undefined,
+      });
+      for (const track of tracks) {
+        await api.playlists.addTrack(playlist.id, track.id);
+      }
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -54,7 +78,7 @@ export default function AlbumPage({
   return (
     <div className="space-y-8 pb-10">
       {/* Album Header Block */}
-      <div className="w-full h-[400px] relative overflow-hidden flex items-end p-6 md:p-10">
+      <div className="w-full h-[400px] relative overflow-hidden flex items-start md:items-end p-6 md:p-10">
         {coverUrl && (
           <div
             className="absolute inset-0 bg-cover bg-center blur-3xl opacity-50 z-0"
@@ -63,8 +87,8 @@ export default function AlbumPage({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent z-10" />
 
-        <div className="relative z-20 flex flex-col md:flex-row items-end gap-6 w-full">
-          <div className="w-48 h-48 md:w-64 md:h-64 rounded-xl shadow-2xl overflow-hidden shrink-0">
+        <div className="relative z-20 flex flex-col md:flex-row items-start gap-6 w-full">
+          <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-xl shadow-[0_0_40px_rgba(154,123,255,0.2)] overflow-hidden shrink-0 flex items-center justify-center">
             {coverUrl ? (
               <img
                 src={coverUrl}
@@ -80,19 +104,32 @@ export default function AlbumPage({
           <div className="space-y-4 flex-1">
             <Typography
               variant="caption"
-              className="uppercase font-bold tracking-widest"
+              className="uppercase font-bold tracking-widest text-accent flex items-center gap-2"
             >
               Album
             </Typography>
             <Typography
               variant="h1"
-              className="text-white drop-shadow-md text-5xl md:text-7xl font-bold"
+              className="text-white drop-shadow-md text-4xl md:text-6xl font-bold"
             >
               {albumName}
             </Typography>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pt-3">
               <Typography variant="caption" className="font-semibold">
-                {artist}
+                {artist.split(";").map((a, i, arr) => (
+                  <span key={i}>
+                    <span
+                      className="hover:underline cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/artist/${encodeURIComponent(a.trim())}`);
+                      }}
+                    >
+                      {a.trim()}
+                    </span>
+                    {i < arr.length - 1 && ", "}
+                  </span>
+                ))}
               </Typography>
               <Typography variant="caption" color="muted">
                 &bull; {tracks.length} songs, {totalMin} min
@@ -107,16 +144,23 @@ export default function AlbumPage({
         <Button
           variant="default"
           size="icon"
-          className="w-14 h-14 rounded-full shadow-lg"
+          className="w-14 h-14 rounded-full shadow-[0_0_20px_rgba(250,88,182,0.4)]"
           onClick={handlePlayAll}
         >
           <Play className="fill-current w-6 h-6 ml-1" />
         </Button>
-        <Button variant="ghost" size="icon" className="w-12 h-12 rounded-full border border-white/20">
-          <Heart className="w-6 h-6 text-muted" />
-        </Button>
-        <Button variant="ghost" size="icon" className="w-12 h-12">
-          <MoreHorizontal className="w-6 h-6 text-muted" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="w-12 h-12 rounded-full border border-white/20"
+          onClick={handleSave}
+          disabled={saving || tracks.length === 0}
+        >
+          {saving ? (
+            <div className="w-5 h-5 border-2 border-muted border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <BookmarkPlus className="w-6 h-6 text-muted hover:text-foreground" />
+          )}
         </Button>
       </div>
 

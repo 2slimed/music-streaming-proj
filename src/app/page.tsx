@@ -1,93 +1,99 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/Button";
 import { Typography } from "@/components/ui/Typography";
-import { AlbumGrid } from "@/components/ui/AlbumGrid";
-import { Play } from "lucide-react";
-import { usePlayerStore } from "@/stores/playerStore";
+import { ScrollRow } from "@/components/ui/ScrollRow";
 import { api } from "@/lib/api";
+import { Play } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Artist } from "@/types/api";
 
-export default function HomePage() {
-  const playTrack = usePlayerStore((s) => s.playTrack);
+const cardWidth = "w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%]";
 
-  const { data: albumsData, isLoading: loadingAlbums } = useQuery({
+export default function HomePage() {
+  const router = useRouter();
+  const { data: popularAlbumsData, isLoading: loadingPopular } = useQuery({
     queryKey: ["albums", "popular"],
-    queryFn: () => api.albums.list({ limit: 12 }),
+    queryFn: () => api.albums.list({ sort: "popular", limit: 12 }),
   });
 
   const { data: artistsData } = useQuery({
     queryKey: ["artists", "discover"],
-    queryFn: () => api.artists.list({ limit: 10 }),
+    queryFn: () => api.artists.list({ limit: 9 }),
   });
 
-  const { data: newAlbumsData } = useQuery({
+  const { data: recentAlbumsData } = useQuery({
     queryKey: ["albums", "recent"],
-    queryFn: () => api.albums.list({ sort: "recent", limit: 6 }),
+    queryFn: () => api.albums.list({ sort: "recent", limit: 12 }),
   });
 
-  const albums = albumsData?.data ?? [];
+  const popularAlbums = popularAlbumsData?.data ?? [];
   const artists = artistsData?.data ?? [];
-  const newAlbums = newAlbumsData?.data ?? [];
-
-  function handlePlayHero() {
-    if (albums.length > 0) {
-      api.tracks.list({ album: albums[0].name, limit: 50 }).then((res) => {
-        if (res.data.length > 0) {
-          playTrack(res.data[0], res.data);
-        }
-      });
-    }
-  }
+  const recentAlbums = recentAlbumsData?.data ?? [];
 
   return (
     <div className="w-full">
       <div className="p-6 md:p-10 space-y-12">
-        {/* Top Hero Banner */}
-        <section>
-          <div className="w-full h-64 md:h-80 rounded-3xl relative overflow-hidden flex items-end p-8 bg-[url('https://images.unsplash.com/photo-1614613535308-eb5fbbf2d098?q=80&w=3174&auto=format&fit=crop')] bg-cover bg-center">
-            <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
-            <div className="relative z-10 space-y-4 max-w-2xl">
-              <Typography
-                variant="caption"
-                className="text-accent uppercase font-bold tracking-widest"
-              >
-                Featured Playlist
-              </Typography>
-              <Typography variant="h1" className="text-white drop-shadow-md">
-                Midnight City
-              </Typography>
-              <Typography variant="body" className="text-white/80 drop-shadow-sm">
-                The best electronic and synthwave tracks curated by AI.
-              </Typography>
-              <div className="flex gap-4 pt-4">
-                <Button
-                  variant="default"
-                  className="gap-2 rounded-full px-8"
-                  onClick={handlePlayHero}
+        {/* Recent Releases */}
+        {recentAlbums.length > 0 && (
+          <section className="space-y-6">
+            <Typography variant="h2">Recent Releases</Typography>
+            <ScrollRow>
+              {recentAlbums.map((album) => (
+                <Link
+                  href={`/album/${encodeURIComponent(album.name)}`}
+                  key={album.id}
+                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group`}
                 >
-                  <Play className="fill-current w-4 h-4" /> Play
-                </Button>
-                <Button variant="outline" className="rounded-full px-8">
-                  Shuffle
-                </Button>
-              </div>
-            </div>
-          </div>
-        </section>
+                  <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+                    {album.coverUrl ? (
+                      <img
+                        src={album.coverUrl}
+                        alt={album.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
+                        <Play className="w-8 h-8 text-muted" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Typography variant="caption" className="block truncate font-semibold">
+                      {album.name}
+                    </Typography>
+                    <Typography variant="caption" color="muted" className="block truncate text-xs">
+                      {album.artists.split(";").map((artist, i, arr) => (
+                        <span key={i}>
+                          <span
+                            className="hover:underline cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              router.push(`/artist/${encodeURIComponent(artist.trim())}`);
+                            }}
+                          >
+                            {artist.trim()}
+                          </span>
+                          {i < arr.length - 1 && ", "}
+                        </span>
+                      ))}
+                    </Typography>
+                  </div>
+                </Link>
+              ))}
+            </ScrollRow>
+          </section>
+        )}
 
-        {/* Section: Albums */}
+        {/* Popular Albums */}
         <section className="space-y-6">
-          <div className="flex items-end justify-between">
-            <Typography variant="h2">Listen Now</Typography>
-          </div>
-
-          {loadingAlbums ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+          <Typography variant="h2">Popular Albums</Typography>
+          {loadingPopular ? (
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="space-y-3">
+                <div key={i} className={`shrink-0 ${cardWidth} space-y-2`}>
                   <div className="aspect-square rounded-xl bg-surface animate-pulse" />
                   <div className="h-4 bg-surface rounded animate-pulse w-3/4" />
                   <div className="h-3 bg-surface rounded animate-pulse w-1/2" />
@@ -95,7 +101,51 @@ export default function HomePage() {
               ))}
             </div>
           ) : (
-            <AlbumGrid albums={albums.slice(0, 6)} />
+            <ScrollRow>
+              {popularAlbums.map((album) => (
+                <Link
+                  href={`/album/${encodeURIComponent(album.name)}`}
+                  key={album.id}
+                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group`}
+                >
+                  <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+                    {album.coverUrl ? (
+                      <img
+                        src={album.coverUrl}
+                        alt={album.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
+                        <Play className="w-8 h-8 text-muted" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Typography variant="caption" className="block truncate font-semibold">
+                      {album.name}
+                    </Typography>
+                    <Typography variant="caption" color="muted" className="block truncate text-xs">
+                      {album.artists.split(";").map((artist, i, arr) => (
+                        <span key={i}>
+                          <span
+                            className="hover:underline cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              router.push(`/artist/${encodeURIComponent(artist.trim())}`);
+                            }}
+                          >
+                            {artist.trim()}
+                          </span>
+                          {i < arr.length - 1 && ", "}
+                        </span>
+                      ))}
+                    </Typography>
+                  </div>
+                </Link>
+              ))}
+            </ScrollRow>
           )}
         </section>
 
@@ -103,14 +153,14 @@ export default function HomePage() {
         {artists.length > 0 && (
           <section className="space-y-6">
             <Typography variant="h2">Discover Artists</Typography>
-            <div className="flex gap-6 overflow-x-auto pb-2 scrollbar-hide">
+            <ScrollRow>
               {artists.map((artist: Artist) => (
                 <Link
                   href={`/artist/${encodeURIComponent(artist.name)}`}
                   key={artist.id}
                   className="flex flex-col items-center gap-3 shrink-0 group"
                 >
-                  <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden shadow-lg bg-surface hover:shadow-xl transition-shadow">
+                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-lg bg-surface hover:shadow-xl transition-shadow">
                     {artist.imageUrl ? (
                       <img
                         src={artist.imageUrl}
@@ -121,7 +171,7 @@ export default function HomePage() {
                       <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20" />
                     )}
                   </div>
-                  <div className="text-center max-w-[7rem] md:max-w-[9rem]">
+                  <div className="text-center max-w-[8rem] md:max-w-[10rem]">
                     <Typography
                       variant="caption"
                       className="block truncate font-semibold group-hover:text-accent transition-colors"
@@ -138,15 +188,7 @@ export default function HomePage() {
                   </div>
                 </Link>
               ))}
-            </div>
-          </section>
-        )}
-
-        {/* New Releases */}
-        {newAlbums.length > 0 && (
-          <section className="space-y-6">
-            <Typography variant="h2">New Releases</Typography>
-            <AlbumGrid albums={newAlbums} />
+            </ScrollRow>
           </section>
         )}
       </div>

@@ -1,11 +1,14 @@
 "use client";
 
-import { use } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { use, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
+import { GlassWindow } from "@/components/ui/GlassWindow";
 import { TrackListItem } from "@/components/ui/TrackListItem";
-import { Play, Heart, MoreHorizontal, Clock, Sparkles } from "lucide-react";
+import { Play, Pencil, Trash2, Clock, Sparkles } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { api } from "@/lib/api";
 
@@ -16,10 +19,36 @@ export default function PlaylistPage({
 }) {
   const { id } = use(params);
   const playTrack = usePlayerStore((s) => s.playTrack);
+  const { data: session } = useSession();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const { data: playlist, isLoading } = useQuery({
     queryKey: ["playlist", id],
     queryFn: () => api.playlists.get(id),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: { name: string }) => api.playlists.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlist", id] });
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
+      setEditing(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.playlists.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
+      router.push("/library");
+    },
   });
 
   const tracks = playlist?.tracks.map((pt) => pt.track) ?? [];
@@ -59,14 +88,16 @@ export default function PlaylistPage({
   const remainMin = totalMin % 60;
   const durationText = totalHr > 0 ? `${totalHr} hr ${remainMin} min` : `${totalMin} min`;
 
+  const isOwner = session?.user?.id === playlist.userId;
+
   return (
     <div className="space-y-8 pb-10">
       {/* Playlist Header Block */}
-      <div className="w-full h-[400px] relative overflow-hidden flex items-end p-6 md:p-10">
+      <div className="w-full h-[400px] relative overflow-hidden flex items-start md:items-end p-6 md:p-10">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 via-background to-background z-0" />
 
-        <div className="relative z-20 flex flex-col md:flex-row items-end gap-6 w-full">
-          <div className="w-48 h-48 md:w-64 md:h-64 rounded-xl shadow-[0_0_40px_rgba(154,123,255,0.2)] overflow-hidden shrink-0 flex items-center justify-center">
+        <div className="relative z-20 flex flex-col md:flex-row items-start gap-6 w-full">
+          <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-xl shadow-[0_0_40px_rgba(154,123,255,0.2)] overflow-hidden shrink-0 flex items-center justify-center">
             {playlist.coverUrl ? (
               <img
                 src={playlist.coverUrl}
@@ -119,13 +150,85 @@ export default function PlaylistPage({
         >
           <Play className="fill-current w-6 h-6 ml-1" />
         </Button>
-        <Button variant="ghost" size="icon" className="w-12 h-12 rounded-full border border-white/20">
-          <Heart className="w-6 h-6 text-muted" />
-        </Button>
-        <Button variant="ghost" size="icon" className="w-12 h-12">
-          <MoreHorizontal className="w-6 h-6 text-muted" />
-        </Button>
+        {isOwner && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-12 h-12 rounded-full border border-white/20"
+              onClick={() => {
+                setEditName(playlist.name);
+                setEditing(true);
+              }}
+            >
+              <Pencil className="w-5 h-5 text-muted hover:text-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-12 h-12"
+              onClick={() => setDeleting(true)}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="w-5 h-5 text-red-400 hover:text-red-300" />
+            </Button>
+          </>
+        )}
       </div>
+
+      {/* Inline Edit */}
+      {editing && (
+        <div className="px-6 md:px-10 flex items-center gap-3">
+          <input
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            className="bg-white/10 border border-white/10 rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-accent flex-1 max-w-sm"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") updateMutation.mutate({ name: editName.trim() });
+            }}
+          />
+          <Button
+            variant="default"
+            size="sm"
+            className="rounded-lg"
+            onClick={() => updateMutation.mutate({ name: editName.trim() })}
+            disabled={updateMutation.isPending || !editName.trim()}
+          >
+            {updateMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+          <Button variant="ghost" size="sm" className="rounded-lg" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeleting(false)} />
+          <GlassWindow intensity="medium" className="relative z-10 w-full max-w-sm p-6 space-y-4">
+            <Typography variant="h3">Delete Playlist?</Typography>
+            <Typography variant="body" color="muted">
+              This will permanently delete &ldquo;{playlist.name}&rdquo; and all its tracks.
+            </Typography>
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" onClick={() => setDeleting(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                className="bg-red-500 hover:bg-red-600"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </GlassWindow>
+        </div>
+      )}
 
       {/* Track List */}
       <div className="px-6 md:px-10">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { GlassWindow } from "@/components/ui/GlassWindow";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
@@ -13,12 +13,14 @@ import {
   Repeat,
   Repeat1,
   Heart,
+  Plus,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { useSession } from "next-auth/react";
+import { AddToPlaylistModal } from "@/components/ui/AddToPlaylistModal";
 import Link from "next/link";
 
 function formatTime(seconds: number): string {
@@ -50,6 +52,7 @@ export function BottomPlayer() {
     currentTrack ? s.isLiked(currentTrack.id) : false,
   );
   const toggleLike = useLibraryStore((s) => s.toggleLike);
+  const [addModalOpen, setAddModalOpen] = useState(false);
 
   const progressBarRef = useRef<HTMLDivElement>(null);
   const volumeBarRef = useRef<HTMLDivElement>(null);
@@ -150,6 +153,28 @@ export function BottomPlayer() {
                 className={`w-4 h-4 ${shuffle ? "text-accent" : "text-muted hover:text-foreground"}`}
               />
             </Button>
+            {session?.user && currentTrack && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleLike(currentTrack.id); }}
+                  className="md:hidden text-muted hover:text-foreground transition-colors"
+                >
+                  <Heart
+                    className={`w-5 h-5 ${
+                      isLiked
+                        ? "text-accent fill-accent"
+                        : ""
+                    }`}
+                  />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setAddModalOpen(true); }}
+                  className="md:hidden text-muted hover:text-foreground transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </>
+            )}
             <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={prevTrack}>
               <SkipBack className="h-5 w-5 fill-foreground md:h-6 md:w-6" />
             </Button>
@@ -205,19 +230,28 @@ export function BottomPlayer() {
         {/* Right Tools */}
         <div className="hidden md:flex items-center justify-end gap-3 w-1/4 min-w-[200px]">
           {session?.user && currentTrack && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => toggleLike(currentTrack.id)}
-            >
-              <Heart
-                className={`w-5 h-5 transition-colors ${
-                  isLiked
-                    ? "text-accent fill-accent"
-                    : "text-muted hover:text-foreground"
-                }`}
-              />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toggleLike(currentTrack.id)}
+              >
+                <Heart
+                  className={`w-5 h-5 transition-colors ${
+                    isLiked
+                      ? "text-accent fill-accent"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setAddModalOpen(true)}
+              >
+                <Plus className="w-5 h-5 text-muted hover:text-foreground" />
+              </Button>
+            </>
           )}
           <div className="flex items-center gap-2 w-28">
             <button
@@ -243,6 +277,14 @@ export function BottomPlayer() {
           </div>
         </div>
       </GlassWindow>
+
+      {currentTrack && (
+        <AddToPlaylistModal
+          trackId={currentTrack.id}
+          open={addModalOpen}
+          onClose={() => setAddModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -9,6 +9,8 @@ import type { NextRequest } from "next/server";
  *   - /api/tracks (GET)   – browsing the catalogue
  *   - /api/playlists (GET) – browsing public playlists
  *   - /api/search (GET)   – searching
+ *   - /api/albums (GET)   – browsing albums
+ *   - /api/artists (GET)  – browsing artists
  *
  * All other /api/** routes require a session cookie.
  * Pages are NOT blocked here; auth checks happen at the component level.
@@ -20,6 +22,8 @@ const PUBLIC_API_ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/tracks", methods: ["GET"] },
   { path: "/api/search", methods: ["GET"] },
   { path: "/api/playlists", methods: ["GET"] },
+  { path: "/api/albums", methods: ["GET"] },
+  { path: "/api/artists", methods: ["GET"] },
 ];
 
 function isPublicApiRoute(pathname: string, method: string): boolean {
@@ -40,6 +44,18 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
         route.path === "/api/playlists" &&
         pathname.startsWith("/api/playlists/") &&
         !pathname.slice("/api/playlists/".length).includes("/")
+      ) {
+        return true;
+      }
+      if (
+        route.path === "/api/albums" &&
+        pathname.startsWith("/api/albums/")
+      ) {
+        return true;
+      }
+      if (
+        route.path === "/api/artists" &&
+        pathname.startsWith("/api/artists/")
       ) {
         return true;
       }

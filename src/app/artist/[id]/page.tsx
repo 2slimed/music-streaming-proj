@@ -1,68 +1,40 @@
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+"use client";
+
+import { use } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TrackListItem } from "@/components/ui/TrackListItem";
 import { Typography } from "@/components/ui/Typography";
 import { Disc3 } from "lucide-react";
 import Link from "next/link";
-import type { Track } from "@/types/api";
+import { notFound } from "next/navigation";
+import { api } from "@/lib/api";
 
-function serializeTrack(t: {
-  id: string;
-  trackId: string;
-  artists: string;
-  albumName: string;
-  trackName: string;
-  popularity: number;
-  durationMs: number;
-  explicit: boolean;
-  danceability: number;
-  energy: number;
-  popularityNorm: number;
-  durationMsNorm: number;
-  explicitNorm: number;
-  danceabilityNorm: number;
-  energyNorm: number;
-  externalId: string | null;
-  previewUrl: string | null;
-  coverUrl: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}): Track {
-  return {
-    ...t,
-    createdAt: t.createdAt.toISOString(),
-    updatedAt: t.updatedAt.toISOString(),
-  };
-}
-
-export default async function ArtistPage({
+export default function ArtistPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const resolvedParams = await params;
-  const decodedName = decodeURIComponent(resolvedParams.id);
+  const { id } = use(params);
+  const decodedName = decodeURIComponent(id);
 
-  const artist = await prisma.artist.findUnique({
-    where: { name: decodedName },
-  });
-
-  const rawTracks = await prisma.track.findMany({
-    where: {
-      artists: {
-        contains: decodedName,
-        mode: "insensitive",
-      },
+  const { data: artist } = useQuery({
+    queryKey: ["artist", decodedName],
+    queryFn: async () => {
+      const res = await api.artists.list({ limit: 100 });
+      return res.data.find((a) => a.name === decodedName) ?? null;
     },
-    orderBy: { popularity: "desc" },
-    take: 50,
   });
 
-  if (rawTracks.length === 0 && !artist) {
+  const { data: tracksData, isLoading } = useQuery({
+    queryKey: ["artist-tracks", decodedName],
+    queryFn: () => api.tracks.list({ artist: decodedName, limit: 50 }),
+  });
+
+  const tracks = tracksData?.data ?? [];
+
+  if (!isLoading && tracks.length === 0 && !artist) {
     notFound();
   }
-
-  const tracks = rawTracks.map(serializeTrack);
 
   const albumNames = [...new Set(tracks.map((t) => t.albumName))];
   const albums = albumNames.map((name) => {
@@ -149,7 +121,7 @@ export default async function ArtistPage({
               />
             ))}
           </div>
-          {tracks.length === 0 && (
+          {tracks.length === 0 && !isLoading && (
             <Typography variant="body" color="muted">
               No tracks found for this artist
             </Typography>

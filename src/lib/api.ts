@@ -78,7 +78,7 @@ export const api = {
         `/api/playlists/${encodeURIComponent(id)}`,
       );
     },
-    create(body: { name: string; description?: string; privacy?: string }) {
+    create(body: { name: string; description?: string; privacy?: string; coverUrl?: string }) {
       return apiFetch<Playlist>("/api/playlists", {
         method: "POST",
         body: JSON.stringify(body),

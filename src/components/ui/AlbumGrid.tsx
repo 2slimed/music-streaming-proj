@@ -7,12 +7,14 @@ import { usePlayerStore } from "@/stores/playerStore";
 import { api } from "@/lib/api";
 import type { Album } from "@/types/api";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface AlbumGridProps {
   albums: Album[];
 }
 
 export function AlbumGrid({ albums }: AlbumGridProps) {
+  const router = useRouter();
   const playTrack = usePlayerStore((s) => s.playTrack);
 
   async function handlePlayAlbum(e: React.MouseEvent, album: Album) {
@@ -30,7 +32,7 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4">
       {albums.map((album) => (
         <Link
           href={`/album/${encodeURIComponent(album.name)}`}
@@ -72,7 +74,21 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
               color="muted"
               className="block truncate text-xs"
             >
-              {album.artists}
+              {album.artists.split(";").map((artist, i, arr) => (
+                <span key={i}>
+                  <span
+                    className="hover:underline cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      router.push(`/artist/${encodeURIComponent(artist.trim())}`);
+                    }}
+                  >
+                    {artist.trim()}
+                  </span>
+                  {i < arr.length - 1 && ", "}
+                </span>
+              ))}
             </Typography>
           </div>
         </Link>
