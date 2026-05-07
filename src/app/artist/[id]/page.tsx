@@ -1,68 +1,32 @@
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
-import { TrackListItem } from "@/components/ui/TrackListItem";
+"use client";
+
+import { use } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Typography } from "@/components/ui/Typography";
-import { Disc3 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { TrackListItem } from "@/components/ui/TrackListItem";
+import { Play } from "lucide-react";
+import { usePlayerStore } from "@/stores/playerStore";
+import { api } from "@/lib/api";
 import Link from "next/link";
-import type { Track } from "@/types/api";
 
-function serializeTrack(t: {
-  id: string;
-  trackId: string;
-  artists: string;
-  albumName: string;
-  trackName: string;
-  popularity: number;
-  durationMs: number;
-  explicit: boolean;
-  danceability: number;
-  energy: number;
-  popularityNorm: number;
-  durationMsNorm: number;
-  explicitNorm: number;
-  danceabilityNorm: number;
-  energyNorm: number;
-  externalId: string | null;
-  previewUrl: string | null;
-  coverUrl: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}): Track {
-  return {
-    ...t,
-    createdAt: t.createdAt.toISOString(),
-    updatedAt: t.updatedAt.toISOString(),
-  };
-}
-
-export default async function ArtistPage({
+export default function ArtistPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const resolvedParams = await params;
-  const decodedName = decodeURIComponent(resolvedParams.id);
+  const { id } = use(params);
+  const playTrack = usePlayerStore((s) => s.playTrack);
 
-  const artist = await prisma.artist.findUnique({
-    where: { name: decodedName },
+  const artistName = decodeURIComponent(id);
+
+  const { data: tracksData, isLoading } = useQuery({
+    queryKey: ["artist-tracks", artistName],
+    queryFn: () =>
+      api.tracks.list({ artist: artistName, sort: "popularity", limit: 50 }),
   });
 
-  const rawTracks = await prisma.track.findMany({
-    where: {
-      artists: {
-        contains: decodedName,
-        mode: "insensitive",
-      },
-    },
-    orderBy: { popularity: "desc" },
-    take: 50,
-  });
-
-  if (rawTracks.length === 0 && !artist) {
-    notFound();
-  }
-
-  const tracks = rawTracks.map(serializeTrack);
+  const tracks = tracksData?.data ?? [];
 
   const albumNames = [...new Set(tracks.map((t) => t.albumName))];
   const albums = albumNames.map((name) => {
@@ -70,75 +34,63 @@ export default async function ArtistPage({
     return { name, coverUrl: t?.coverUrl };
   });
 
+  function handlePlayAll() {
+    if (tracks.length > 0) {
+      playTrack(tracks[0], tracks);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8 pb-10">
+        <div className="w-full h-[400px] bg-surface animate-pulse" />
+        <div className="px-6 md:px-10 space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-16 bg-surface animate-pulse rounded-md" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto bg-background">
-      {/* Artist Header */}
-      <div className="relative h-64 md:h-80 w-full flex items-end p-6 md:p-10 shrink-0">
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent z-10" />
-        {artist?.imageUrl ? (
-          <img
-            src={artist.imageUrl}
-            alt={decodedName}
-            className="absolute inset-0 w-full h-full object-cover opacity-60"
-          />
-        ) : (
-          <div className="absolute inset-0 w-full h-full bg-surface" />
-        )}
+    <div className="space-y-8 pb-10">
+      {/* Artist Hero Header */}
+      <div className="w-full h-[400px] relative overflow-hidden flex items-end p-6 md:p-10 justify-center text-center">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/20 via-background to-background z-0" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent z-10" />
 
-        <div className="relative z-20 flex gap-6 items-end">
-          {artist?.imageUrl ? (
-            <div className="w-32 h-32 md:w-48 md:h-48 rounded-full overflow-hidden shadow-2xl border-4 border-background/20 hidden sm:block">
-              <img
-                src={artist.imageUrl}
-                alt={decodedName}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ) : (
-            <div className="w-32 h-32 md:w-48 md:h-48 rounded-full bg-surface-hover shadow-2xl flex items-center justify-center hidden sm:flex">
-              <Disc3 className="w-16 h-16 text-muted opacity-50" />
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <Typography
-              variant="caption"
-              className="uppercase tracking-widest text-accent font-semibold"
+        <div className="relative z-20 space-y-4 max-w-4xl mx-auto flex flex-col items-center">
+          <Typography variant="caption" className="flex items-center gap-2 bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-blue-500/30">
+            Artist
+          </Typography>
+          <Typography
+            variant="h1"
+            className="text-white drop-shadow-lg text-6xl md:text-8xl font-black tracking-tighter"
+          >
+            {artistName}
+          </Typography>
+          <Typography variant="body" className="text-white/80">
+            {tracksData?.meta.total ?? 0} tracks available
+          </Typography>
+          <div className="flex gap-4 pt-4">
+            <Button
+              variant="default"
+              className="rounded-full px-8 gap-2"
+              onClick={handlePlayAll}
             >
-              Artist
-            </Typography>
-            <Typography
-              variant="h1"
-              className="text-4xl md:text-6xl font-black text-white drop-shadow-md"
-            >
-              {decodedName}
-            </Typography>
-            {artist?.bio && (
-              <Typography
-                variant="body"
-                color="muted"
-                className="line-clamp-2 max-w-2xl mt-2"
-              >
-                {artist.bio}
-              </Typography>
-            )}
-            <Typography variant="caption" color="muted" className="mt-1">
-              {tracks.length} tracks
-              {artist?.nbFan != null &&
-                ` · ${artist.nbFan.toLocaleString()} fans`}
-            </Typography>
+              <Play className="w-4 h-4 fill-current" /> Play
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Track List */}
-      <div className="flex-1 px-6 md:px-10 pb-20 space-y-12">
-        <section className="space-y-4">
-          <Typography variant="h3" className="font-bold">
-            Popular
-          </Typography>
+      <div className="px-6 md:px-10 space-y-12">
+        {/* Popular Tracks */}
+        <section className="space-y-6">
+          <Typography variant="h2">Popular</Typography>
           <div className="space-y-1">
-            {tracks.map((track, i) => (
+            {tracks.slice(0, 10).map((track, i) => (
               <TrackListItem
                 key={track.id}
                 track={track}
@@ -159,9 +111,7 @@ export default async function ArtistPage({
         {/* Albums */}
         {albums.length > 0 && (
           <section className="space-y-6">
-            <Typography variant="h3" className="font-bold">
-              Albums
-            </Typography>
+            <Typography variant="h2">Albums</Typography>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
               {albums.map((album) => (
                 <Link

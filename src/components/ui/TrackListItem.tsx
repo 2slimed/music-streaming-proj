@@ -7,7 +7,6 @@ import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { useSession } from "next-auth/react";
 import type { Track } from "@/types/api";
-import Link from "next/link";
 
 function formatDuration(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -95,19 +94,8 @@ export function TrackListItem({
           >
             {track.trackName}
           </Typography>
-          <Typography variant="caption" color="muted" className="truncate flex gap-1">
-            {track.artists.split(";").map((artist, i, arr) => (
-              <span key={i}>
-                <Link
-                  href={`/artist/${encodeURIComponent(artist.trim())}`}
-                  className="hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {artist.trim()}
-                </Link>
-                {i < arr.length - 1 && ", "}
-              </span>
-            ))}
+          <Typography variant="caption" color="muted" className="truncate">
+            {track.artists}
           </Typography>
         </div>
       </div>
