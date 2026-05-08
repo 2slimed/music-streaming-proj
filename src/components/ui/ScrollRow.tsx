@@ -62,8 +62,8 @@ export function ScrollRow({ children, className = "", scrollAmount = 400 }: Scro
       )}
       <div
         ref={containerRef}
-        className="scrollrow-container flex gap-4 overflow-x-auto scroll-smooth"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="scrollrow-container flex gap-4 overflow-x-auto scroll-smooth py-2 px-2"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none", overflowY: "visible" }}
         onScroll={updateScrollButtons}
       >
         {children}

@@ -17,16 +17,16 @@ export function TrackGrid({ tracks }: TrackGridProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
       {tracks.map((track) => (
-        <div key={track.id} className="space-y-3 cursor-pointer group">
+        <div key={track.id} className="space-y-3 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]">
           <div
-            className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg"
+            className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg"
             onClick={() => playTrack(track, tracks)}
           >
             {track.coverUrl ? (
               <img
                 src={track.coverUrl}
                 alt={track.trackName}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">

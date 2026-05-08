@@ -21,11 +21,12 @@ export function Sidebar() {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; description: string; coverUrl: string }) =>
+    mutationFn: (data: { name: string; description: string; coverUrl: string; privacy: "PUBLIC" | "PRIVATE" }) =>
       api.playlists.create({
         name: data.name,
         description: data.description || undefined,
         coverUrl: data.coverUrl || undefined,
+        privacy: data.privacy,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlists"] });

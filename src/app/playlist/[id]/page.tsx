@@ -34,11 +34,12 @@ export default function PlaylistPage({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { name: string; description: string; coverUrl: string }) =>
+    mutationFn: (data: { name: string; description: string; coverUrl: string; privacy: "PUBLIC" | "PRIVATE" }) =>
       api.playlists.update(id, {
         name: data.name,
         description: data.description || undefined,
         coverUrl: data.coverUrl || null,
+        privacy: data.privacy,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlist", id] });
@@ -188,6 +189,7 @@ export default function PlaylistPage({
         initialName={playlist.name}
         initialDescription={playlist.description ?? ""}
         initialCoverUrl={playlist.coverUrl ?? ""}
+        initialPrivacy={playlist.privacy as "PUBLIC" | "PRIVATE"}
       />
 
       {/* Delete Confirmation — portaled to document.body to escape overflow clipping */}

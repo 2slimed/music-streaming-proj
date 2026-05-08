@@ -7,7 +7,6 @@ import { TrackListItem } from "@/components/ui/TrackListItem";
 import { AlbumGrid } from "@/components/ui/AlbumGrid";
 import { ScrollRow } from "@/components/ui/ScrollRow";
 import { Search, X, Disc3 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import type { Playlist, Artist } from "@/types/api";
 import Link from "next/link";
@@ -39,6 +38,7 @@ export default function SearchPage() {
     queryKey: ["search", debouncedQuery, activeTab],
     queryFn: () => api.search(debouncedQuery, activeTab, 20),
     enabled: debouncedQuery.length > 0,
+    placeholderData: (prev) => prev,
   });
 
   const tracks = results?.tracks ?? [];
@@ -91,8 +91,8 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* Loading */}
-      {isLoading && debouncedQuery && (
+      {/* Loading — only shown on the very first search, not on subsequent refetches */}
+      {isLoading && !results && debouncedQuery && (
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-16 bg-surface animate-pulse rounded-md" />
@@ -101,7 +101,7 @@ export default function SearchPage() {
       )}
 
       {/* Results */}
-      {!isLoading && debouncedQuery && (
+      {results && debouncedQuery && (
         <>
           {activeTab === "all" ? (
             <>
@@ -114,14 +114,14 @@ export default function SearchPage() {
                       <Link
                         href={`/artist/${encodeURIComponent(artist.name)}`}
                         key={artist.id}
-                        className="flex flex-col items-center gap-3 shrink-0 group"
+                        className="flex flex-col items-center gap-3 shrink-0 group transition-transform duration-200 hover:scale-[1.03]"
                       >
-                        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-lg bg-surface hover:shadow-xl transition-shadow">
+                        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-lg bg-surface">
                           {artist.imageUrl ? (
                             <img
                               src={artist.imageUrl}
                               alt={artist.name}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
@@ -159,14 +159,14 @@ export default function SearchPage() {
                       <Link
                         href={`/album/${encodeURIComponent(album.name)}`}
                         key={album.id}
-                        className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-2 cursor-pointer group"
+                        className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
                       >
-                        <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+                        <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
                           {album.coverUrl ? (
                             <img
                               src={album.coverUrl}
                               alt={album.name}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
@@ -202,57 +202,29 @@ export default function SearchPage() {
                 </section>
               )}
 
-              {/* Tracks (limit 10) */}
-              {tracks.length > 0 && (
-                <section className="space-y-4">
-                  <Typography variant="h3">Tracks</Typography>
-                  <div className="space-y-1">
-                    {tracks.slice(0, 10).map((track, i) => (
-                      <TrackListItem
-                        key={track.id}
-                        track={track}
-                        index={i}
-                        queue={tracks}
-                        showAlbum
-                        showCover
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
-
               {/* Playlists */}
               {playlists.length > 0 && (
                 <section className="space-y-4">
                   <Typography variant="h3">Playlists</Typography>
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                  <ScrollRow>
                     {playlists.map((playlist: Playlist) => (
                       <Link
                         href={`/playlist/${playlist.id}`}
                         key={playlist.id}
-                        className="space-y-3 cursor-pointer group"
+                        className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
                       >
-                        <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+                        <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
                           {playlist.coverUrl ? (
                             <img
                               src={playlist.coverUrl}
                               alt={playlist.name}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
                               <Play className="w-10 h-10 text-muted" />
                             </div>
                           )}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Button
-                              variant="default"
-                              size="icon"
-                              className="rounded-full h-12 w-12 hover:scale-110"
-                            >
-                              <Play className="fill-current w-5 h-5 ml-1" />
-                            </Button>
-                          </div>
                         </div>
                         <div>
                           <Typography
@@ -271,6 +243,25 @@ export default function SearchPage() {
                           </Typography>
                         </div>
                       </Link>
+                    ))}
+                  </ScrollRow>
+                </section>
+              )}
+
+              {/* Tracks (limit 10) */}
+              {tracks.length > 0 && (
+                <section className="space-y-4">
+                  <Typography variant="h3">Tracks</Typography>
+                  <div className="space-y-1">
+                    {tracks.slice(0, 10).map((track, i) => (
+                      <TrackListItem
+                        key={track.id}
+                        track={track}
+                        index={i}
+                        queue={tracks}
+                        showAlbum
+                        showCover
+                      />
                     ))}
                   </div>
                 </section>
@@ -314,14 +305,14 @@ export default function SearchPage() {
                       <Link
                         href={`/artist/${encodeURIComponent(artist.name)}`}
                         key={artist.id}
-                        className="flex flex-col items-center gap-3 group"
+                        className="flex flex-col items-center gap-3 group transition-transform duration-200 hover:scale-[1.03]"
                       >
-                        <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden shadow-lg bg-surface hover:shadow-xl transition-shadow">
+                        <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden shadow-lg bg-surface">
                           {artist.imageUrl ? (
                             <img
                               src={artist.imageUrl}
                               alt={artist.name}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
@@ -354,34 +345,25 @@ export default function SearchPage() {
               {playlists.length > 0 && (
                 <section className="space-y-4">
                   <Typography variant="h3">Playlists</Typography>
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                  <ScrollRow>
                     {playlists.map((playlist: Playlist) => (
                       <Link
                         href={`/playlist/${playlist.id}`}
                         key={playlist.id}
-                        className="space-y-3 cursor-pointer group"
+                        className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
                       >
-                        <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+                        <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
                           {playlist.coverUrl ? (
                             <img
                               src={playlist.coverUrl}
                               alt={playlist.name}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
                               <Play className="w-10 h-10 text-muted" />
                             </div>
                           )}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Button
-                              variant="default"
-                              size="icon"
-                              className="rounded-full h-12 w-12 hover:scale-110"
-                            >
-                              <Play className="fill-current w-5 h-5 ml-1" />
-                            </Button>
-                          </div>
                         </div>
                         <div>
                           <Typography
@@ -401,7 +383,7 @@ export default function SearchPage() {
                         </div>
                       </Link>
                     ))}
-                  </div>
+                  </ScrollRow>
                 </section>
               )}
             </>

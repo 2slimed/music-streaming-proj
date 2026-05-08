@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Typography } from "@/components/ui/Typography";
-import { Button } from "@/components/ui/Button";
 import { TrackListItem } from "@/components/ui/TrackListItem";
 import { ScrollRow } from "@/components/ui/ScrollRow";
 import { Play, Heart, Disc3 } from "lucide-react";
@@ -102,29 +101,20 @@ export default function LibraryPage() {
             <Link
               href={`/playlist/${playlist.id}`}
               key={playlist.id}
-              className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-3 cursor-pointer group"
+                className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-3 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
             >
               <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
                 {playlist.coverUrl ? (
                   <img
                     src={playlist.coverUrl}
                     alt={playlist.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
                     <Play className="w-10 h-10 text-muted" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Button
-                    variant="default"
-                    size="icon"
-                    className="rounded-full h-12 w-12 hover:scale-110"
-                  >
-                    <Play className="fill-current w-5 h-5 ml-1" />
-                  </Button>
-                </div>
               </div>
               <div>
                 <Typography
@@ -163,29 +153,20 @@ export default function LibraryPage() {
               <Link
                 href={`/album/${encodeURIComponent(saved.album.name)}`}
                 key={saved.id}
-                className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-3 cursor-pointer group"
+              className="shrink-0 w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%] space-y-3 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
               >
                 <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
                   {saved.album.coverUrl ? (
                     <img
                       src={saved.album.coverUrl}
                       alt={saved.album.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
                       <Disc3 className="w-10 h-10 text-muted" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Button
-                      variant="default"
-                      size="icon"
-                      className="rounded-full h-12 w-12 hover:scale-110"
-                    >
-                      <Play className="fill-current w-5 h-5 ml-1" />
-                    </Button>
-                  </div>
                 </div>
                 <div>
                   <Typography variant="caption" className="block truncate font-semibold">

@@ -37,14 +37,14 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
         <Link
           href={`/album/${encodeURIComponent(album.name)}`}
           key={album.id}
-          className="space-y-3 cursor-pointer group"
+          className="space-y-3 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
         >
-          <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+          <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
             {album.coverUrl ? (
               <img
                 src={album.coverUrl}
                 alt={album.name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">

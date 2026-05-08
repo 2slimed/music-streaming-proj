@@ -5,17 +5,18 @@ import { createPortal } from "react-dom";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { GlassWindow } from "@/components/ui/GlassWindow";
-import { X, Sparkles, ImagePlus } from "lucide-react";
+import { X, Sparkles, ImagePlus, Globe, Lock } from "lucide-react";
 
 interface PlaylistModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: { name: string; description: string; coverUrl: string }) => void;
+  onSave: (data: { name: string; description: string; coverUrl: string; privacy: "PUBLIC" | "PRIVATE" }) => void;
   isSaving: boolean;
   /** When omitted the modal renders in "create" mode */
   initialName?: string;
   initialDescription?: string;
   initialCoverUrl?: string;
+  initialPrivacy?: "PUBLIC" | "PRIVATE";
   mode?: "create" | "edit";
 }
 
@@ -27,6 +28,7 @@ export function PlaylistModal({
   initialName = "",
   initialDescription = "",
   initialCoverUrl = "",
+  initialPrivacy = "PRIVATE",
   mode = "edit",
 }: PlaylistModalProps) {
   const [name, setName] = useState(initialName);
@@ -34,6 +36,7 @@ export function PlaylistModal({
   const [coverUrl, setCoverUrl] = useState(initialCoverUrl);
   const [coverPreview, setCoverPreview] = useState(initialCoverUrl);
   const [coverError, setCoverError] = useState(false);
+  const [privacy, setPrivacy] = useState<"PUBLIC" | "PRIVATE">(initialPrivacy);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Sync fields when modal opens with fresh initial values
@@ -44,8 +47,9 @@ export function PlaylistModal({
       setCoverUrl(initialCoverUrl);
       setCoverPreview(initialCoverUrl);
       setCoverError(false);
+      setPrivacy(initialPrivacy);
     }
-  }, [open, initialName, initialDescription, initialCoverUrl]);
+  }, [open, initialName, initialDescription, initialCoverUrl, initialPrivacy]);
 
   function handleCoverUrlChange(value: string) {
     setCoverUrl(value);
@@ -55,7 +59,7 @@ export function PlaylistModal({
 
   function handleSubmit() {
     if (!name.trim() || isSaving) return;
-    onSave({ name: name.trim(), description: description.trim(), coverUrl: coverUrl.trim() });
+    onSave({ name: name.trim(), description: description.trim(), coverUrl: coverUrl.trim(), privacy });
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -158,6 +162,44 @@ export function PlaylistModal({
             rows={3}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent transition-colors resize-none"
           />
+        </div>
+
+        {/* Privacy */}
+        <div className="space-y-1">
+          <label className="block text-xs text-muted font-medium uppercase tracking-wider">
+            Visibility
+          </label>
+          <div className="flex rounded-lg overflow-hidden border border-white/10">
+            <button
+              type="button"
+              onClick={() => setPrivacy("PRIVATE")}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                privacy === "PRIVATE"
+                  ? "bg-accent/20 text-accent border-r border-white/10"
+                  : "text-muted hover:text-foreground hover:bg-white/5 border-r border-white/10"
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              Private
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrivacy("PUBLIC")}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                privacy === "PUBLIC"
+                  ? "bg-accent/20 text-accent"
+                  : "text-muted hover:text-foreground hover:bg-white/5"
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              Public
+            </button>
+          </div>
+          <p className="text-xs text-muted/70">
+            {privacy === "PUBLIC"
+              ? "Anyone can find this playlist in search."
+              : "Only you can see this playlist."}
+          </p>
         </div>
 
         {/* Actions */}

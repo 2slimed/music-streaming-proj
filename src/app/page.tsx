@@ -56,14 +56,14 @@ export default function HomePage() {
                 <Link
                   href={`/album/${encodeURIComponent(album.name)}`}
                   key={album.id}
-                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group`}
+                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]`}
                 >
-                  <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+                  <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
                     {album.coverUrl ? (
                       <img
                         src={album.coverUrl}
                         alt={album.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
@@ -118,14 +118,14 @@ export default function HomePage() {
                 <Link
                   href={`/album/${encodeURIComponent(album.name)}`}
                   key={album.id}
-                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group`}
+                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]`}
                 >
-                  <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+                  <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
                     {album.coverUrl ? (
                       <img
                         src={album.coverUrl}
                         alt={album.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
@@ -181,14 +181,14 @@ export default function HomePage() {
                 <Link
                   href={`/artist/${encodeURIComponent(artist.name)}`}
                   key={artist.id}
-                  className="flex flex-col items-center gap-3 shrink-0 group"
+                  className="flex flex-col items-center gap-3 shrink-0 group transition-transform duration-200 hover:scale-[1.03]"
                 >
-                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-lg bg-surface hover:shadow-xl transition-shadow">
+                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-lg bg-surface">
                     {artist.imageUrl ? (
                       <img
                         src={artist.imageUrl}
                         alt={artist.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20" />
