@@ -102,7 +102,7 @@ export async function GET(
       });
 
       const freshUrl = await resolveDeezerPreview(track.trackName, track.artists);
-      if (freshUrl) {
+      if (freshUrl && isAllowedPreviewUrl(freshUrl)) {
         upstream = await fetch(freshUrl, { headers: upstreamHeaders });
         if (upstream.ok || upstream.status === 206) {
           await prisma.track.update({

@@ -26,9 +26,21 @@ export default function ArtistPage({
     queryKey: ["artist-tracks", decodedName],
     queryFn: () => api.tracks.list({ artist: decodedName, limit: 50 }),
   });
+  const { data: artist, isLoading: isLoadingArtist } = useQuery({
+    queryKey: ["artist", decodedName],
+    queryFn: () => api.artists.get(decodedName).catch(() => null),
+  });
+
+  const { data: tracksData, isLoading } = useQuery({
+    queryKey: ["artist-tracks", decodedName],
+    queryFn: () => api.tracks.list({ artist: decodedName, limit: 50 }),
+  });
 
   const tracks = tracksData?.data ?? [];
 
+  if (!isLoading && !isLoadingArtist && tracks.length === 0 && !artist) {
+    notFound();
+  }
   if (!isLoading && tracks.length === 0 && !artist) {
     notFound();
   }
