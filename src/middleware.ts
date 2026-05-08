@@ -7,7 +7,8 @@ import type { NextRequest } from "next/server";
  * Public routes (no auth required):
  *   - /api/auth/**        – NextAuth handlers
  *   - /api/tracks (GET)   – browsing the catalogue
- *   - /api/playlists (GET) – browsing public playlists
+ *   - /api/playlists (GET)      – browsing public playlists
+ *   - /api/playlists/:id (GET)  – viewing a single playlist (NOT /containing)
  *   - /api/search (GET)   – searching
  *   - /api/albums (GET)   – browsing albums
  *   - /api/artists (GET)  – browsing artists
@@ -43,7 +44,8 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
       if (
         route.path === "/api/playlists" &&
         pathname.startsWith("/api/playlists/") &&
-        !pathname.slice("/api/playlists/".length).includes("/")
+        !pathname.slice("/api/playlists/".length).includes("/") &&
+        pathname !== "/api/playlists/containing"
       ) {
         return true;
       }
