@@ -32,7 +32,7 @@ export default function LibraryPage() {
 
   const { data: savedAlbumsData, isLoading: loadingSavedAlbums } = useQuery({
     queryKey: ["saved-albums"],
-    queryFn: () => api.library.albums.list({ limit: 50 }),
+    queryFn: () => api.library.albums.list({ limit: 200 }),
     enabled: !!session?.user,
   });
 

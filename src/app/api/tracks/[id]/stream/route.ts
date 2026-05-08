@@ -3,20 +3,20 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
-const ALLOWED_PREVIEW_HOSTS = [
-  "cdns-preview-",
-  "cdnt-uscdn",
-  "e-cdns-",
-  "dzcdn.net",
-];
+// Hostnames that are allowed as exact matches or .<domain> suffixes
+const ALLOWED_PREVIEW_DOMAINS = ["dzcdn.net"];
+// Hostnames that are allowed when the hostname *starts with* this prefix
+const ALLOWED_PREVIEW_PREFIXES = ["cdns-preview-", "cdnt-uscdn", "e-cdns-"];
 
 function isAllowedPreviewUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") return false;
-    return ALLOWED_PREVIEW_HOSTS.some(
-      (h) => parsed.hostname.includes(h) || parsed.hostname.endsWith("dzcdn.net")
-    );
+    const h = parsed.hostname.toLowerCase();
+    if (ALLOWED_PREVIEW_DOMAINS.some((d) => h === d || h.endsWith(`.${d}`)))
+      return true;
+    if (ALLOWED_PREVIEW_PREFIXES.some((p) => h.startsWith(p))) return true;
+    return false;
   } catch {
     return false;
   }

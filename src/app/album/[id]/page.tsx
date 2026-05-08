@@ -32,7 +32,7 @@ export default function AlbumPage({
   // Fetch user's saved albums to derive saved state
   const { data: savedAlbumsData } = useQuery({
     queryKey: ["saved-albums"],
-    queryFn: () => api.library.albums.list({ limit: 100 }),
+    queryFn: () => api.library.albums.list({ limit: 200 }),
     enabled: !!session?.user,
   });
 
