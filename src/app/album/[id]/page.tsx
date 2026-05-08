@@ -33,6 +33,7 @@ export default function AlbumPage({
   const { data: savedAlbumsData } = useQuery({
     queryKey: ["saved-albums"],
     queryFn: () => api.library.albums.list({ limit: 100 }),
+    enabled: !!session?.user,
   });
 
   const [toggling, setToggling] = useState(false);
