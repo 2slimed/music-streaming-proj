@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 
 interface LibraryState {
   likedTrackIds: Set<string>;
@@ -22,9 +23,18 @@ export const useLibraryStore = create<LibraryState & LibraryActions>(
 
     fetchLikedIds: async () => {
       try {
-        const res = await api.library.list({ limit: 100 });
-        const ids = new Set(res.data.map((item) => item.trackId));
-        set({ likedTrackIds: ids, loaded: true });
+        const PAGE_SIZE = 100;
+        let page = 1;
+        const allIds: string[] = [];
+
+        while (true) {
+          const res = await api.library.list({ page, limit: PAGE_SIZE });
+          allIds.push(...res.data.map((item) => item.trackId));
+          if (page >= res.meta.totalPages) break;
+          page++;
+        }
+
+        set({ likedTrackIds: new Set(allIds), loaded: true });
       } catch {
         set({ loaded: true });
       }
@@ -48,6 +58,7 @@ export const useLibraryStore = create<LibraryState & LibraryActions>(
         } else {
           await api.library.add(trackId);
         }
+        queryClient.invalidateQueries({ queryKey: ["library"] });
       } catch {
         const rollback = new Set(get().likedTrackIds);
         if (wasLiked) {

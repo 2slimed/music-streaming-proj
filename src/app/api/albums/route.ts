@@ -19,32 +19,31 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 20));
     const sort = searchParams.get("sort") ?? "name";
 
-    // Popular sort: rank albums by average track popularity (derived from tracks)
+    // Popular sort: rank albums by average track popularity using a single raw SQL query
     if (sort === "popular") {
-      const albums = await prisma.album.findMany();
+      const total = await prisma.album.count();
 
-      const trackAggs = await prisma.track.groupBy({
-        by: ["albumName", "artists"],
-        _avg: { popularity: true },
-      });
-
-      const popMap = new Map<string, number>();
-      for (const agg of trackAggs) {
-        const key = agg.albumName + "|||" + agg.artists;
-        popMap.set(key, Math.round(agg._avg.popularity ?? 0));
-      }
-
-      albums.sort((a, b) => {
-        const popA = popMap.get(a.name + "|||" + a.artists) ?? 0;
-        const popB = popMap.get(b.name + "|||" + b.artists) ?? 0;
-        return popB - popA;
-      });
-
-      const total = albums.length;
-      const paginated = albums.slice((page - 1) * limit, page * limit);
+      const albums = await prisma.$queryRaw<
+        Array<{
+          id: string;
+          name: string;
+          artists: string;
+          coverUrl: string | null;
+          createdAt: Date;
+          updatedAt: Date;
+          avg_popularity: number | null;
+        }>
+      >`
+        SELECT a.*, AVG(t.popularity) AS avg_popularity
+        FROM "Album" a
+        LEFT JOIN "Track" t ON t."albumName" = a.name AND t."artists" = a.artists
+        GROUP BY a.id
+        ORDER BY avg_popularity DESC NULLS LAST
+        LIMIT ${limit} OFFSET ${(page - 1) * limit}
+      `;
 
       return NextResponse.json({
-        data: paginated,
+        data: albums,
         meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
       });
     }

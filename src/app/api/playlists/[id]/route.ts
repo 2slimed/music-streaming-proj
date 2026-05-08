@@ -72,7 +72,18 @@ export async function PATCH(
       }
       data.name = body.name.trim();
     }
-    if (body.description !== undefined) data.description = body.description;
+    if (body.description !== undefined) {
+      if (body.description !== null && typeof body.description !== "string") {
+        return NextResponse.json({ error: "description must be a string or null" }, { status: 400 });
+      }
+      data.description = body.description;
+    }
+    if (body.coverUrl !== undefined) {
+      if (body.coverUrl !== null && typeof body.coverUrl !== "string") {
+        return NextResponse.json({ error: "coverUrl must be a string or null" }, { status: 400 });
+      }
+      data.coverUrl = body.coverUrl || null;
+    }
     if (body.privacy !== undefined) data.privacy = body.privacy === "PUBLIC" ? "PUBLIC" : "PRIVATE";
 
     const updated = await prisma.playlist.update({ where: { id }, data });

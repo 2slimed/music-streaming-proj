@@ -18,12 +18,12 @@ export default function HomePage() {
     queryFn: () => api.albums.list({ sort: "popular", limit: 12 }),
   });
 
-  const { data: artistsData } = useQuery({
+  const { data: artistsData, isLoading: loadingArtists } = useQuery({
     queryKey: ["artists", "discover"],
     queryFn: () => api.artists.list({ limit: 9 }),
   });
 
-  const { data: recentAlbumsData } = useQuery({
+  const { data: recentAlbumsData, isLoading: loadingRecent } = useQuery({
     queryKey: ["albums", "recent"],
     queryFn: () => api.albums.list({ sort: "recent", limit: 12 }),
   });
@@ -36,9 +36,21 @@ export default function HomePage() {
     <div className="w-full">
       <div className="p-6 md:p-10 space-y-12">
         {/* Recent Releases */}
-        {recentAlbums.length > 0 && (
-          <section className="space-y-6">
-            <Typography variant="h2">Recent Releases</Typography>
+        <section className="space-y-6">
+          <Typography variant="h2">Recent Releases</Typography>
+          {loadingRecent ? (
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className={`shrink-0 ${cardWidth} space-y-2`}>
+                  <div className="aspect-square rounded-xl bg-surface animate-pulse" />
+                  <div className="h-4 bg-surface rounded animate-pulse w-3/4" />
+                  <div className="h-3 bg-surface rounded animate-pulse w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : recentAlbums.length === 0 ? (
+            <Typography variant="body" color="muted">No recent releases</Typography>
+          ) : (
             <ScrollRow>
               {recentAlbums.map((album) => (
                 <Link
@@ -84,8 +96,8 @@ export default function HomePage() {
                 </Link>
               ))}
             </ScrollRow>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* Popular Albums */}
         <section className="space-y-6">
@@ -150,9 +162,20 @@ export default function HomePage() {
         </section>
 
         {/* Discover Artists */}
-        {artists.length > 0 && (
-          <section className="space-y-6">
-            <Typography variant="h2">Discover Artists</Typography>
+        <section className="space-y-6">
+          <Typography variant="h2">Discover Artists</Typography>
+          {loadingArtists ? (
+            <div className="flex gap-6 overflow-x-auto scrollbar-hide">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-3 shrink-0">
+                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-surface animate-pulse" />
+                  <div className="h-3 bg-surface rounded animate-pulse w-20" />
+                </div>
+              ))}
+            </div>
+          ) : artists.length === 0 ? (
+            <Typography variant="body" color="muted">No artists found</Typography>
+          ) : (
             <ScrollRow>
               {artists.map((artist: Artist) => (
                 <Link
@@ -189,8 +212,8 @@ export default function HomePage() {
                 </Link>
               ))}
             </ScrollRow>
-          </section>
-        )}
+          )}
+        </section>
       </div>
     </div>
   );

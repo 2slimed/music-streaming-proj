@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
@@ -39,20 +40,10 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
   const { data: containingIds } = useQuery({
     queryKey: ["playlists-containing", trackId],
     queryFn: async () => {
-      const ids: string[] = [];
-      for (const p of userPlaylists) {
-        try {
-          const detail = await api.playlists.get(p.id);
-          if (detail.tracks.some((pt) => pt.trackId === trackId)) {
-            ids.push(p.id);
-          }
-        } catch {
-          // skip
-        }
-      }
-      return new Set(ids);
+      const res = await api.playlists.containing(trackId);
+      return new Set(res.data);
     },
-    enabled: open && !!session?.user && userPlaylists.length > 0,
+    enabled: open && !!session?.user,
   });
 
   // Close modal on route change (browser back/forward)
@@ -130,13 +121,16 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
 
   if (!open) return null;
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-auto" onClick={handleClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <GlassWindow
         intensity="medium"
         className="relative z-10 w-full max-w-sm p-6 space-y-4 max-h-[80vh] overflow-y-auto"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add to Playlist"
       >
         <div className="flex items-center justify-between">
           <Typography variant="h3">Add to Playlist</Typography>
@@ -219,4 +213,6 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
       </GlassWindow>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modal, document.body) : null;
 }

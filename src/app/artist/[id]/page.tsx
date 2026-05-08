@@ -19,10 +19,7 @@ export default function ArtistPage({
 
   const { data: artist } = useQuery({
     queryKey: ["artist", decodedName],
-    queryFn: async () => {
-      const res = await api.artists.list({ limit: 100 });
-      return res.data.find((a) => a.name === decodedName) ?? null;
-    },
+    queryFn: () => api.artists.get(decodedName).catch(() => null),
   });
 
   const { data: tracksData, isLoading } = useQuery({

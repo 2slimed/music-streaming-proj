@@ -2,13 +2,23 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function POST(request: Request) {
   try {
     const { name, email, password } = await request.json();
 
-    if (!email || !password) {
+    // 2-7: name non-empty + basic email format validation
+    if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: "Name is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!email || typeof email !== "string" || !EMAIL_RE.test(email)) {
+      return NextResponse.json(
+        { error: "A valid email address is required" },
         { status: 400 }
       );
     }
@@ -22,8 +32,9 @@ export async function POST(request: Request) {
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
+      // 2-6: return generic message to prevent user enumeration
       return NextResponse.json(
-        { error: "A user with this email already exists" },
+        { error: "Registration failed. Please try again." },
         { status: 409 }
       );
     }
@@ -31,7 +42,7 @@ export async function POST(request: Request) {
     const passwordHash = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.create({
-      data: { name, email, passwordHash },
+      data: { name: name.trim(), email, passwordHash },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     });
 

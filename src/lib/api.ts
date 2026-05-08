@@ -5,6 +5,7 @@ import type {
   Playlist,
   PlaylistWithTracks,
   LibraryItem,
+  SavedAlbum,
   UserProfile,
   PaginatedResponse,
   SearchResults,
@@ -86,7 +87,7 @@ export const api = {
     },
     update(
       id: string,
-      body: { name?: string; description?: string; privacy?: string },
+      body: { name?: string; description?: string; privacy?: string; coverUrl?: string | null },
     ) {
       return apiFetch<Playlist>(`/api/playlists/${encodeURIComponent(id)}`, {
         method: "PATCH",
@@ -111,6 +112,11 @@ export const api = {
         { method: "DELETE", body: JSON.stringify({ trackId }) },
       );
     },
+    containing(trackId: string) {
+      return apiFetch<{ data: string[] }>(
+        `/api/playlists/containing?trackId=${encodeURIComponent(trackId)}`
+      );
+    },
   },
 
   library: {
@@ -131,6 +137,25 @@ export const api = {
         body: JSON.stringify({ trackId }),
       });
     },
+    albums: {
+      list(params?: { page?: number; limit?: number }) {
+        return apiFetch<PaginatedResponse<SavedAlbum>>(
+          `/api/library/albums${qs(params ?? {})}`,
+        );
+      },
+      save(albumId: string) {
+        return apiFetch<SavedAlbum>("/api/library/albums", {
+          method: "POST",
+          body: JSON.stringify({ albumId }),
+        });
+      },
+      unsave(albumId: string) {
+        return apiFetch<{ success: boolean }>("/api/library/albums", {
+          method: "DELETE",
+          body: JSON.stringify({ albumId }),
+        });
+      },
+    },
   },
 
   albums: {
@@ -146,6 +171,9 @@ export const api = {
       return apiFetch<PaginatedResponse<Artist>>(
         `/api/artists${qs(params ?? {})}`,
       );
+    },
+    get(name: string) {
+      return apiFetch<Artist>(`/api/artists/${encodeURIComponent(name)}`);
     },
   },
 

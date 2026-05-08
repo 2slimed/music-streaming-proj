@@ -52,7 +52,7 @@ export async function POST(
         },
         include: { track: true },
       });
-    });
+    }, { isolationLevel: "Serializable" });
 
     return NextResponse.json(entry, { status: 201 });
   } catch (error: unknown) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -8,6 +9,7 @@ import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { GlassWindow } from "@/components/ui/GlassWindow";
 import { TrackListItem } from "@/components/ui/TrackListItem";
+import { PlaylistModal } from "@/components/ui/PlaylistModal";
 import { Play, Pencil, Trash2, Clock, Sparkles } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { api } from "@/lib/api";
@@ -24,7 +26,6 @@ export default function PlaylistPage({
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState(false);
-  const [editName, setEditName] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   const { data: playlist, isLoading } = useQuery({
@@ -33,7 +34,12 @@ export default function PlaylistPage({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { name: string }) => api.playlists.update(id, data),
+    mutationFn: (data: { name: string; description: string; coverUrl: string }) =>
+      api.playlists.update(id, {
+        name: data.name,
+        description: data.description || undefined,
+        coverUrl: data.coverUrl || null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlist", id] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
@@ -103,7 +109,7 @@ export default function PlaylistPage({
                 src={playlist.coverUrl}
                 alt={playlist.name}
                 className="w-full h-full object-cover"
-              />
+      />
             ) : (
               <div className="w-full h-full bg-gradient-to-tr from-accent to-purple-600 flex items-center justify-center">
                 <Sparkles className="w-24 h-24 text-white opacity-50" />
@@ -156,10 +162,7 @@ export default function PlaylistPage({
               variant="ghost"
               size="icon"
               className="w-12 h-12 rounded-full border border-white/20"
-              onClick={() => {
-                setEditName(playlist.name);
-                setEditing(true);
-              }}
+              onClick={() => setEditing(true)}
             >
               <Pencil className="w-5 h-5 text-muted hover:text-foreground" />
             </Button>
@@ -176,40 +179,23 @@ export default function PlaylistPage({
         )}
       </div>
 
-      {/* Inline Edit */}
-      {editing && (
-        <div className="px-6 md:px-10 flex items-center gap-3">
-          <input
-            type="text"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            className="bg-white/10 border border-white/10 rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-accent flex-1 max-w-sm"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") updateMutation.mutate({ name: editName.trim() });
-            }}
-          />
-          <Button
-            variant="default"
-            size="sm"
-            className="rounded-lg"
-            onClick={() => updateMutation.mutate({ name: editName.trim() })}
-            disabled={updateMutation.isPending || !editName.trim()}
-          >
-            {updateMutation.isPending ? "Saving..." : "Save"}
-          </Button>
-          <Button variant="ghost" size="sm" className="rounded-lg" onClick={() => setEditing(false)}>
-            Cancel
-          </Button>
-        </div>
-      )}
+      {/* Edit Playlist Modal */}
+      <PlaylistModal
+        open={editing}
+        onClose={() => setEditing(false)}
+        onSave={(data) => updateMutation.mutate(data)}
+        isSaving={updateMutation.isPending}
+        initialName={playlist.name}
+        initialDescription={playlist.description ?? ""}
+        initialCoverUrl={playlist.coverUrl ?? ""}
+      />
 
-      {/* Delete Confirmation */}
-      {deleting && (
+      {/* Delete Confirmation — portaled to document.body to escape overflow clipping */}
+      {deleting && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeleting(false)} />
-          <GlassWindow intensity="medium" className="relative z-10 w-full max-w-sm p-6 space-y-4">
-            <Typography variant="h3">Delete Playlist?</Typography>
+          <GlassWindow intensity="medium" className="relative z-10 w-full max-w-sm p-6 space-y-4" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title">
+            <Typography variant="h3" id="delete-dialog-title">Delete Playlist?</Typography>
             <Typography variant="body" color="muted">
               This will permanently delete &ldquo;{playlist.name}&rdquo; and all its tracks.
             </Typography>
@@ -227,7 +213,8 @@ export default function PlaylistPage({
               </Button>
             </div>
           </GlassWindow>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Track List */}

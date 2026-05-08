@@ -24,7 +24,6 @@ interface TrackListItemProps {
   queue?: Track[];
   showAlbum?: boolean;
   showCover?: boolean;
-  showAddToPlaylist?: boolean;
 }
 
 export function TrackListItem({
@@ -33,7 +32,6 @@ export function TrackListItem({
   queue,
   showAlbum = false,
   showCover = true,
-  showAddToPlaylist = true,
 }: TrackListItemProps) {
   const currentTrack = usePlayerStore((s) => s.currentTrack);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
@@ -63,6 +61,10 @@ export function TrackListItem({
           isCurrentTrack ? "bg-white/5" : ""
         }`}
         onClick={handlePlay}
+        role="button"
+        tabIndex={0}
+        aria-label={`Play ${track.trackName}`}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handlePlay(); } }}
       >
         <div className="w-12 flex items-center justify-center">
           <Typography

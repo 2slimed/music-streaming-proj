@@ -3,6 +3,25 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
+const ALLOWED_PREVIEW_HOSTS = [
+  "cdns-preview-",
+  "cdnt-uscdn",
+  "e-cdns-",
+  "dzcdn.net",
+];
+
+function isAllowedPreviewUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    return ALLOWED_PREVIEW_HOSTS.some(
+      (h) => parsed.hostname.includes(h) || parsed.hostname.endsWith("dzcdn.net")
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * GET /api/tracks/:id/stream
  *
@@ -55,6 +74,14 @@ export async function GET(
       return NextResponse.json(
         { error: "No preview available for this track" },
         { status: 404 }
+      );
+    }
+
+    // SSRF guard: only proxy URLs from known Deezer CDN hosts
+    if (!isAllowedPreviewUrl(previewUrl)) {
+      return NextResponse.json(
+        { error: "Invalid preview URL" },
+        { status: 422 }
       );
     }
 

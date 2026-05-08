@@ -148,6 +148,7 @@ export function BottomPlayer() {
               size="icon"
               className="hidden md:flex"
               onClick={toggleShuffle}
+              aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
             >
               <Shuffle
                 className={`w-4 h-4 ${shuffle ? "text-accent" : "text-muted hover:text-foreground"}`}
@@ -175,7 +176,7 @@ export function BottomPlayer() {
                 </button>
               </>
             )}
-            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={prevTrack}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={prevTrack} aria-label="Previous track">
               <SkipBack className="h-5 w-5 fill-foreground md:h-6 md:w-6" />
             </Button>
             <Button
@@ -183,6 +184,7 @@ export function BottomPlayer() {
               size="icon"
               className="h-11 w-11 bg-foreground text-background hover:bg-foreground/90 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.2)] md:h-12 md:w-12"
               onClick={togglePlay}
+              aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
                 <Pause className="h-5 w-5 fill-current md:h-6 md:w-6" />
@@ -190,7 +192,7 @@ export function BottomPlayer() {
                 <Play className="ml-0.5 h-5 w-5 fill-current md:ml-1 md:h-6 md:w-6" />
               )}
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={nextTrack}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={nextTrack} aria-label="Next track">
               <SkipForward className="h-5 w-5 fill-foreground md:h-6 md:w-6" />
             </Button>
             <Button
@@ -198,6 +200,7 @@ export function BottomPlayer() {
               size="icon"
               className="hidden md:flex"
               onClick={toggleRepeat}
+              aria-label={repeat === "off" ? "Enable repeat" : repeat === "one" ? "Disable repeat" : "Repeat one"}
             >
               <RepeatIcon
                 className={`w-4 h-4 ${repeat !== "off" ? "text-accent" : "text-muted hover:text-foreground"}`}
@@ -235,6 +238,7 @@ export function BottomPlayer() {
                 variant="ghost"
                 size="icon"
                 onClick={() => toggleLike(currentTrack.id)}
+                aria-label={isLiked ? "Unlike track" : "Like track"}
               >
                 <Heart
                   className={`w-5 h-5 transition-colors ${
@@ -248,6 +252,7 @@ export function BottomPlayer() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setAddModalOpen(true)}
+                aria-label="Add to playlist"
               >
                 <Plus className="w-5 h-5 text-muted hover:text-foreground" />
               </Button>
@@ -257,6 +262,7 @@ export function BottomPlayer() {
             <button
               onClick={toggleMute}
               className="text-muted hover:text-foreground transition-colors"
+              aria-label={volume === 0 ? "Unmute" : "Mute"}
             >
               {volume === 0 ? (
                 <VolumeX className="w-5 h-5" />

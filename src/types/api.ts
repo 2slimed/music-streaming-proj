@@ -106,6 +106,14 @@ export interface Artist {
   updatedAt: string;
 }
 
+export interface SavedAlbum {
+  id: string;
+  userId: string;
+  albumId: string;
+  savedAt: string;
+  album: Album;
+}
+
 export interface SearchResults {
   tracks?: Track[];
   albums?: Album[];

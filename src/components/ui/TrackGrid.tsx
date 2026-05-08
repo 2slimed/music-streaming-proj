@@ -50,15 +50,23 @@ export function TrackGrid({ tracks }: TrackGridProps) {
             >
               {track.trackName}
             </Typography>
-            <Link href={`/artist/${encodeURIComponent(track.artists)}`}>
-              <Typography
-                variant="caption"
-                color="muted"
-                className="block truncate text-xs hover:underline"
-              >
-                {track.artists}
-              </Typography>
-            </Link>
+            <Typography
+              variant="caption"
+              color="muted"
+              className="block truncate text-xs"
+            >
+              {track.artists.split(";").map((a, i, arr) => (
+                <span key={i}>
+                  <Link
+                    href={`/artist/${encodeURIComponent(a.trim())}`}
+                    className="hover:underline"
+                  >
+                    {a.trim()}
+                  </Link>
+                  {i < arr.length - 1 && ", "}
+                </span>
+              ))}
+            </Typography>
           </div>
         </div>
       ))}

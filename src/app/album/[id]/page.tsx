@@ -2,10 +2,11 @@
 
 import { use, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { TrackListItem } from "@/components/ui/TrackListItem";
-import { Play, BookmarkPlus, Clock } from "lucide-react";
+import { Play, Bookmark, Clock } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -17,6 +18,7 @@ export default function AlbumPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const { data: session } = useSession();
   const playTrack = usePlayerStore((s) => s.playTrack);
   const queryClient = useQueryClient();
 
@@ -27,7 +29,13 @@ export default function AlbumPage({
     queryFn: () => api.tracks.list({ album: albumName, limit: 50 }),
   });
 
-  const [saving, setSaving] = useState(false);
+  // Fetch user's saved albums to derive saved state
+  const { data: savedAlbumsData } = useQuery({
+    queryKey: ["saved-albums"],
+    queryFn: () => api.library.albums.list({ limit: 100 }),
+  });
+
+  const [toggling, setToggling] = useState(false);
 
   const tracks = tracksData?.data ?? [];
   const firstTrack = tracks[0];
@@ -37,28 +45,38 @@ export default function AlbumPage({
   const totalMs = tracks.reduce((acc, t) => acc + t.durationMs, 0);
   const totalMin = Math.floor(totalMs / 60000);
 
+  // Find the saved entry for this album (matched by album name)
+  const savedEntry = savedAlbumsData?.data.find(
+    (s) => s.album.name === albumName,
+  );
+  const isSaved = !!savedEntry;
+
   function handlePlayAll() {
     if (tracks.length > 0) {
       playTrack(tracks[0], tracks);
     }
   }
 
-  async function handleSave() {
-    if (tracks.length === 0 || saving) return;
-    setSaving(true);
+  async function handleToggleSave() {
+    if (toggling) return;
+    setToggling(true);
     try {
-      const playlist = await api.playlists.create({
-        name: albumName,
-        description: `Tracks from ${albumName} by ${artist}`,
-        coverUrl: coverUrl ?? undefined,
-      });
-      for (const track of tracks) {
-        await api.playlists.addTrack(playlist.id, track.id);
+      if (isSaved && savedEntry) {
+        await api.library.albums.unsave(savedEntry.albumId);
+      } else {
+        // Resolve album id from the albums list — find by name
+        const allAlbums = await api.albums.list({ limit: 200 });
+        const album = allAlbums.data.find((a) => a.name === albumName);
+        if (!album) {
+          console.error("Album record not found in DB for name:", albumName);
+          return;
+        }
+        await api.library.albums.save(album.id);
       }
-      queryClient.invalidateQueries({ queryKey: ["playlists"] });
-      queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
+      queryClient.invalidateQueries({ queryKey: ["saved-albums"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-saved-albums"] });
     } finally {
-      setSaving(false);
+      setToggling(false);
     }
   }
 
@@ -153,13 +171,20 @@ export default function AlbumPage({
           variant="ghost"
           size="icon"
           className="w-12 h-12 rounded-full border border-white/20"
-          onClick={handleSave}
-          disabled={saving || tracks.length === 0}
+          onClick={handleToggleSave}
+          disabled={toggling || tracks.length === 0 || !session?.user}
+          title={!session?.user ? "Sign in to save" : isSaved ? "Remove from library" : "Save to library"}
         >
-          {saving ? (
+          {toggling ? (
             <div className="w-5 h-5 border-2 border-muted border-t-transparent rounded-full animate-spin" />
           ) : (
-            <BookmarkPlus className="w-6 h-6 text-muted hover:text-foreground" />
+            <Bookmark
+              className={`w-6 h-6 transition-colors ${
+                isSaved
+                  ? "fill-accent text-accent"
+                  : "text-muted hover:text-foreground"
+              }`}
+            />
           )}
         </Button>
       </div>
