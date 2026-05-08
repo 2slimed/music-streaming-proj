@@ -62,12 +62,15 @@ export async function GET(
     if (!previewUrl) {
       previewUrl = await resolveDeezerPreview(track.trackName, track.artists);
 
-      if (previewUrl) {
+      if (previewUrl && isAllowedPreviewUrl(previewUrl)) {
         await prisma.track.update({
           where: { id: track.id },
           data: { previewUrl },
         });
+      } else {
+        previewUrl = null;
       }
+    }
     }
 
     if (!previewUrl) {
