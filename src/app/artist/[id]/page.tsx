@@ -1,68 +1,37 @@
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+"use client";
+
+import { use } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TrackListItem } from "@/components/ui/TrackListItem";
 import { Typography } from "@/components/ui/Typography";
 import { Disc3 } from "lucide-react";
 import Link from "next/link";
-import type { Track } from "@/types/api";
+import { notFound } from "next/navigation";
+import { api } from "@/lib/api";
 
-function serializeTrack(t: {
-  id: string;
-  trackId: string;
-  artists: string;
-  albumName: string;
-  trackName: string;
-  popularity: number;
-  durationMs: number;
-  explicit: boolean;
-  danceability: number;
-  energy: number;
-  popularityNorm: number;
-  durationMsNorm: number;
-  explicitNorm: number;
-  danceabilityNorm: number;
-  energyNorm: number;
-  externalId: string | null;
-  previewUrl: string | null;
-  coverUrl: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}): Track {
-  return {
-    ...t,
-    createdAt: t.createdAt.toISOString(),
-    updatedAt: t.updatedAt.toISOString(),
-  };
-}
-
-export default async function ArtistPage({
+export default function ArtistPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const resolvedParams = await params;
-  const decodedName = decodeURIComponent(resolvedParams.id);
+  const { id } = use(params);
+  const decodedName = decodeURIComponent(id);
 
-  const artist = await prisma.artist.findUnique({
-    where: { name: decodedName },
+  const { data: artist, isLoading: isLoadingArtist } = useQuery({
+    queryKey: ["artist", decodedName],
+    queryFn: () => api.artists.get(decodedName).catch(() => null),
   });
 
-  const rawTracks = await prisma.track.findMany({
-    where: {
-      artists: {
-        contains: decodedName,
-        mode: "insensitive",
-      },
-    },
-    orderBy: { popularity: "desc" },
-    take: 50,
+  const { data: tracksData, isLoading } = useQuery({
+    queryKey: ["artist-tracks", decodedName],
+    queryFn: () => api.tracks.list({ artist: decodedName, limit: 50 }),
   });
 
-  if (rawTracks.length === 0 && !artist) {
+  const tracks = tracksData?.data ?? [];
+
+  if (!isLoading && !isLoadingArtist && tracks.length === 0 && !artist) {
     notFound();
   }
-
-  const tracks = rawTracks.map(serializeTrack);
 
   const albumNames = [...new Set(tracks.map((t) => t.albumName))];
   const albums = albumNames.map((name) => {
@@ -149,7 +118,7 @@ export default async function ArtistPage({
               />
             ))}
           </div>
-          {tracks.length === 0 && (
+          {tracks.length === 0 && !isLoading && (
             <Typography variant="body" color="muted">
               No tracks found for this artist
             </Typography>
@@ -167,14 +136,14 @@ export default async function ArtistPage({
                 <Link
                   href={`/album/${encodeURIComponent(album.name)}`}
                   key={album.name}
-                  className="space-y-3 cursor-pointer group"
+                  className="space-y-3 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
                 >
-                  <div className="aspect-square rounded-xl bg-surface hover:bg-surface-hover overflow-hidden relative shadow-lg">
+                  <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
                     {album.coverUrl ? (
                       <img
                         src={album.coverUrl}
                         alt={album.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20" />

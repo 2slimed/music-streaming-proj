@@ -1,7 +1,26 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+
+// Hostnames that are allowed as exact matches or .<domain> suffixes
+const ALLOWED_PREVIEW_DOMAINS = ["dzcdn.net"];
+// Hostnames that are allowed when the hostname *starts with* this prefix
+const ALLOWED_PREVIEW_PREFIXES = ["cdns-preview-", "cdnt-uscdn", "e-cdns-"];
+
+function isAllowedPreviewUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    const h = parsed.hostname.toLowerCase();
+    if (ALLOWED_PREVIEW_DOMAINS.some((d) => h === d || h.endsWith(`.${d}`)))
+      return true;
+    if (ALLOWED_PREVIEW_PREFIXES.some((p) => h.startsWith(p))) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * GET /api/tracks/:id/stream
@@ -43,18 +62,29 @@ export async function GET(
     if (!previewUrl) {
       previewUrl = await resolveDeezerPreview(track.trackName, track.artists);
 
-      if (previewUrl) {
+      if (previewUrl && isAllowedPreviewUrl(previewUrl)) {
         await prisma.track.update({
           where: { id: track.id },
           data: { previewUrl },
         });
+      } else {
+        previewUrl = null;
       }
+    }
     }
 
     if (!previewUrl) {
       return NextResponse.json(
         { error: "No preview available for this track" },
         { status: 404 }
+      );
+    }
+
+    // SSRF guard: only proxy URLs from known Deezer CDN hosts
+    if (!isAllowedPreviewUrl(previewUrl)) {
+      return NextResponse.json(
+        { error: "Invalid preview URL" },
+        { status: 422 }
       );
     }
 
@@ -75,7 +105,7 @@ export async function GET(
       });
 
       const freshUrl = await resolveDeezerPreview(track.trackName, track.artists);
-      if (freshUrl) {
+      if (freshUrl && isAllowedPreviewUrl(freshUrl)) {
         upstream = await fetch(freshUrl, { headers: upstreamHeaders });
         if (upstream.ok || upstream.status === 206) {
           await prisma.track.update({
@@ -93,19 +123,6 @@ export async function GET(
       );
     }
 
-    // Record play only on initial request (no Range header) and after
-    // confirming the upstream fetch succeeded. Using after() ensures the
-    // DB write completes even in serverless/edge environments.
-    const userId = session.user.id;
-    if (userId && !rangeHeader) {
-      after(async () => {
-        try {
-          await prisma.recentPlay.create({
-            data: { userId, trackId: track.id },
-          });
-        } catch { /* play tracking is best-effort */ }
-      });
-    }
 
     const responseHeaders = new Headers();
     responseHeaders.set("Content-Type", upstream.headers.get("Content-Type") ?? "audio/mpeg");

@@ -1,91 +1,111 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
-import { Button } from "@/components/ui/Button";
 import { Typography } from "@/components/ui/Typography";
-import { TrackGrid } from "@/components/ui/TrackGrid";
-import { TrackListItem } from "@/components/ui/TrackListItem";
-import { Play } from "lucide-react";
-import { usePlayerStore } from "@/stores/playerStore";
+import { ScrollRow } from "@/components/ui/ScrollRow";
 import { api } from "@/lib/api";
+import { Play } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { Artist } from "@/types/api";
+
+const cardWidth = "w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%]";
 
 export default function HomePage() {
-  const { data: session } = useSession();
-  const playTrack = usePlayerStore((s) => s.playTrack);
-
-  const { data: popularData, isLoading: loadingPopular } = useQuery({
-    queryKey: ["tracks", "popular"],
-    queryFn: () => api.tracks.list({ sort: "popularity", limit: 12 }),
+  const router = useRouter();
+  const { data: popularAlbumsData, isLoading: loadingPopular } = useQuery({
+    queryKey: ["albums", "popular"],
+    queryFn: () => api.albums.list({ sort: "popular", limit: 12 }),
   });
 
-  const { data: recentData } = useQuery({
-    queryKey: ["recent-plays"],
-    queryFn: () => api.profile.recentPlays(10),
-    enabled: !!session?.user,
+  const { data: artistsData, isLoading: loadingArtists } = useQuery({
+    queryKey: ["artists", "discover"],
+    queryFn: () => api.artists.list({ limit: 9 }),
   });
 
-  const { data: newData } = useQuery({
-    queryKey: ["tracks", "recent"],
-    queryFn: () => api.tracks.list({ sort: "recent", limit: 6 }),
+  const { data: recentAlbumsData, isLoading: loadingRecent } = useQuery({
+    queryKey: ["albums", "recent"],
+    queryFn: () => api.albums.list({ sort: "recent", limit: 12 }),
   });
 
-  const popularTracks = popularData?.data ?? [];
-  const recentTracks = recentData?.data.map((rp) => rp.track) ?? [];
-  const newTracks = newData?.data ?? [];
-
-  function handlePlayHero() {
-    if (popularTracks.length > 0) {
-      playTrack(popularTracks[0], popularTracks);
-    }
-  }
+  const popularAlbums = popularAlbumsData?.data ?? [];
+  const artists = artistsData?.data ?? [];
+  const recentAlbums = recentAlbumsData?.data ?? [];
 
   return (
     <div className="w-full">
       <div className="p-6 md:p-10 space-y-12">
-        {/* Top Hero Banner */}
-        <section>
-          <div className="w-full h-64 md:h-80 rounded-3xl relative overflow-hidden flex items-end p-8 bg-[url('https://images.unsplash.com/photo-1614613535308-eb5fbbf2d098?q=80&w=3174&auto=format&fit=crop')] bg-cover bg-center">
-            <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
-            <div className="relative z-10 space-y-4 max-w-2xl">
-              <Typography
-                variant="caption"
-                className="text-accent uppercase font-bold tracking-widest"
-              >
-                Featured Playlist
-              </Typography>
-              <Typography variant="h1" className="text-white drop-shadow-md">
-                Midnight City
-              </Typography>
-              <Typography variant="body" className="text-white/80 drop-shadow-sm">
-                The best electronic and synthwave tracks curated by AI.
-              </Typography>
-              <div className="flex gap-4 pt-4">
-                <Button
-                  variant="default"
-                  className="gap-2 rounded-full px-8"
-                  onClick={handlePlayHero}
-                >
-                  <Play className="fill-current w-4 h-4" /> Play
-                </Button>
-                <Button variant="outline" className="rounded-full px-8">
-                  Shuffle
-                </Button>
-              </div>
+        {/* Recent Releases */}
+        <section className="space-y-6">
+          <Typography variant="h2">Recent Releases</Typography>
+          {loadingRecent ? (
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className={`shrink-0 ${cardWidth} space-y-2`}>
+                  <div className="aspect-square rounded-xl bg-surface animate-pulse" />
+                  <div className="h-4 bg-surface rounded animate-pulse w-3/4" />
+                  <div className="h-3 bg-surface rounded animate-pulse w-1/2" />
+                </div>
+              ))}
             </div>
-          </div>
+          ) : recentAlbums.length === 0 ? (
+            <Typography variant="body" color="muted">No recent releases</Typography>
+          ) : (
+            <ScrollRow>
+              {recentAlbums.map((album) => (
+                <Link
+                  href={`/album/${encodeURIComponent(album.name)}`}
+                  key={album.id}
+                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]`}
+                >
+                  <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
+                    {album.coverUrl ? (
+                      <img
+                        src={album.coverUrl}
+                        alt={album.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
+                        <Play className="w-8 h-8 text-muted" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Typography variant="caption" className="block truncate font-semibold">
+                      {album.name}
+                    </Typography>
+                    <Typography variant="caption" color="muted" className="block truncate text-xs">
+                      {album.artists.split(";").map((artist, i, arr) => (
+                        <span key={i}>
+                          <span
+                            className="hover:underline cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              router.push(`/artist/${encodeURIComponent(artist.trim())}`);
+                            }}
+                          >
+                            {artist.trim()}
+                          </span>
+                          {i < arr.length - 1 && ", "}
+                        </span>
+                      ))}
+                    </Typography>
+                  </div>
+                </Link>
+              ))}
+            </ScrollRow>
+          )}
         </section>
 
-        {/* Section: Listen Now (Popular Tracks) */}
+        {/* Popular Albums */}
         <section className="space-y-6">
-          <div className="flex items-end justify-between">
-            <Typography variant="h2">Listen Now</Typography>
-          </div>
-
+          <Typography variant="h2">Popular Albums</Typography>
           {loadingPopular ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="space-y-3">
+                <div key={i} className={`shrink-0 ${cardWidth} space-y-2`}>
                   <div className="aspect-square rounded-xl bg-surface animate-pulse" />
                   <div className="h-4 bg-surface rounded animate-pulse w-3/4" />
                   <div className="h-3 bg-surface rounded animate-pulse w-1/2" />
@@ -93,36 +113,107 @@ export default function HomePage() {
               ))}
             </div>
           ) : (
-            <TrackGrid tracks={popularTracks.slice(0, 6)} />
+            <ScrollRow>
+              {popularAlbums.map((album) => (
+                <Link
+                  href={`/album/${encodeURIComponent(album.name)}`}
+                  key={album.id}
+                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]`}
+                >
+                  <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
+                    {album.coverUrl ? (
+                      <img
+                        src={album.coverUrl}
+                        alt={album.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20 flex items-center justify-center">
+                        <Play className="w-8 h-8 text-muted" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Typography variant="caption" className="block truncate font-semibold">
+                      {album.name}
+                    </Typography>
+                    <Typography variant="caption" color="muted" className="block truncate text-xs">
+                      {album.artists.split(";").map((artist, i, arr) => (
+                        <span key={i}>
+                          <span
+                            className="hover:underline cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              router.push(`/artist/${encodeURIComponent(artist.trim())}`);
+                            }}
+                          >
+                            {artist.trim()}
+                          </span>
+                          {i < arr.length - 1 && ", "}
+                        </span>
+                      ))}
+                    </Typography>
+                  </div>
+                </Link>
+              ))}
+            </ScrollRow>
           )}
         </section>
 
-        {/* Recently Played */}
-        {recentTracks.length > 0 && (
-          <section className="space-y-6">
-            <Typography variant="h2">Recently Played</Typography>
-            <div className="space-y-1">
-              {recentTracks.slice(0, 5).map((track, i) => (
-                <TrackListItem
-                  key={`${track.id}-${i}`}
-                  track={track}
-                  index={i}
-                  queue={recentTracks}
-                  showAlbum
-                  showCover
-                />
+        {/* Discover Artists */}
+        <section className="space-y-6">
+          <Typography variant="h2">Discover Artists</Typography>
+          {loadingArtists ? (
+            <div className="flex gap-6 overflow-x-auto scrollbar-hide">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-3 shrink-0">
+                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-surface animate-pulse" />
+                  <div className="h-3 bg-surface rounded animate-pulse w-20" />
+                </div>
               ))}
             </div>
-          </section>
-        )}
-
-        {/* New Releases */}
-        {newTracks.length > 0 && (
-          <section className="space-y-6">
-            <Typography variant="h2">New Releases</Typography>
-            <TrackGrid tracks={newTracks} />
-          </section>
-        )}
+          ) : artists.length === 0 ? (
+            <Typography variant="body" color="muted">No artists found</Typography>
+          ) : (
+            <ScrollRow>
+              {artists.map((artist: Artist) => (
+                <Link
+                  href={`/artist/${encodeURIComponent(artist.name)}`}
+                  key={artist.id}
+                  className="flex flex-col items-center gap-3 shrink-0 group transition-transform duration-200 hover:scale-[1.03]"
+                >
+                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-lg bg-surface">
+                    {artist.imageUrl ? (
+                      <img
+                        src={artist.imageUrl}
+                        alt={artist.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-600/20" />
+                    )}
+                  </div>
+                  <div className="text-center max-w-[8rem] md:max-w-[10rem]">
+                    <Typography
+                      variant="caption"
+                      className="block truncate font-semibold group-hover:text-accent transition-colors"
+                    >
+                      {artist.name}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="muted"
+                      className="block truncate text-xs"
+                    >
+                      Artist
+                    </Typography>
+                  </div>
+                </Link>
+              ))}
+            </ScrollRow>
+          )}
+        </section>
       </div>
     </div>
   );

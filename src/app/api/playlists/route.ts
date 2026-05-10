@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/playlists
  * Create a new playlist (requires auth).
- * Body: { name, description?, privacy? }
+ * Body: { name, description?, privacy?, coverUrl? }
  */
 export async function POST(request: Request) {
   const session = await auth();
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { name, description, privacy } = await request.json();
+    const { name, description, privacy, coverUrl } = await request.json();
 
     if (typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Playlist name is required" }, { status: 400 });
@@ -61,6 +61,7 @@ export async function POST(request: Request) {
         name: name.trim(),
         description: description ?? null,
         privacy: privacy === "PUBLIC" ? "PUBLIC" : "PRIVATE",
+        coverUrl: typeof coverUrl === "string" ? coverUrl : null,
         userId: session.user.id,
       },
     });

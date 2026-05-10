@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { GlassWindow } from "@/components/ui/GlassWindow";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
@@ -13,12 +13,15 @@ import {
   Repeat,
   Repeat1,
   Heart,
+  Plus,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { useSession } from "next-auth/react";
+import { AddToPlaylistModal } from "@/components/ui/AddToPlaylistModal";
+import Link from "next/link";
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return "0:00";
@@ -49,6 +52,7 @@ export function BottomPlayer() {
     currentTrack ? s.isLiked(currentTrack.id) : false,
   );
   const toggleLike = useLibraryStore((s) => s.toggleLike);
+  const [addModalOpen, setAddModalOpen] = useState(false);
 
   const progressBarRef = useRef<HTMLDivElement>(null);
   const volumeBarRef = useRef<HTMLDivElement>(null);
@@ -101,20 +105,37 @@ export function BottomPlayer() {
             )}
           </div>
           <div className="flex min-w-0 flex-col max-md:rounded-xl max-md:border max-md:border-white/10 max-md:bg-background/70 max-md:px-3 max-md:py-2 max-md:shadow-[0_12px_28px_rgba(0,0,0,0.35)] max-md:backdrop-blur-md">
-            <Typography
-              variant="caption"
-              className="line-clamp-1 text-base font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-            >
-              {currentTrack?.trackName ?? "Not Playing"}
-            </Typography>
-            {currentTrack && (
+            {currentTrack ? (
+              <Link href={`/album/${encodeURIComponent(currentTrack.albumName)}`} className="hover:underline">
+                <Typography
+                  variant="caption"
+                  className="line-clamp-1 text-base font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                >
+                  {currentTrack.trackName}
+                </Typography>
+              </Link>
+            ) : (
               <Typography
                 variant="caption"
-                color="muted"
-                className="line-clamp-1 text-xs text-foreground/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
+                className="line-clamp-1 text-base font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               >
-                {currentTrack.artists}
+                Not Playing
               </Typography>
+            )}
+            {currentTrack && (
+              <span className="line-clamp-1 text-xs text-foreground/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+                {currentTrack.artists.split(";").map((artist, i, arr) => (
+                  <span key={artist.trim()}>
+                    <Link
+                      href={`/artist/${encodeURIComponent(artist.trim())}`}
+                      className="hover:underline"
+                    >
+                      {artist.trim()}
+                    </Link>
+                    {i < arr.length - 1 && ", "}
+                  </span>
+                ))}
+              </span>
             )}
           </div>
         </div>
@@ -127,12 +148,35 @@ export function BottomPlayer() {
               size="icon"
               className="hidden md:flex"
               onClick={toggleShuffle}
+              aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
             >
               <Shuffle
                 className={`w-4 h-4 ${shuffle ? "text-accent" : "text-muted hover:text-foreground"}`}
               />
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={prevTrack}>
+            {session?.user && currentTrack && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleLike(currentTrack.id); }}
+                  className="md:hidden text-muted hover:text-foreground transition-colors"
+                >
+                  <Heart
+                    className={`w-5 h-5 ${
+                      isLiked
+                        ? "text-accent fill-accent"
+                        : ""
+                    }`}
+                  />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setAddModalOpen(true); }}
+                  className="md:hidden text-muted hover:text-foreground transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </>
+            )}
+            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={prevTrack} aria-label="Previous track">
               <SkipBack className="h-5 w-5 fill-foreground md:h-6 md:w-6" />
             </Button>
             <Button
@@ -140,6 +184,7 @@ export function BottomPlayer() {
               size="icon"
               className="h-11 w-11 bg-foreground text-background hover:bg-foreground/90 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.2)] md:h-12 md:w-12"
               onClick={togglePlay}
+              aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
                 <Pause className="h-5 w-5 fill-current md:h-6 md:w-6" />
@@ -147,7 +192,7 @@ export function BottomPlayer() {
                 <Play className="ml-0.5 h-5 w-5 fill-current md:ml-1 md:h-6 md:w-6" />
               )}
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={nextTrack}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10" onClick={nextTrack} aria-label="Next track">
               <SkipForward className="h-5 w-5 fill-foreground md:h-6 md:w-6" />
             </Button>
             <Button
@@ -155,6 +200,7 @@ export function BottomPlayer() {
               size="icon"
               className="hidden md:flex"
               onClick={toggleRepeat}
+              aria-label={repeat === "off" ? "Enable repeat" : repeat === "one" ? "Disable repeat" : "Repeat one"}
             >
               <RepeatIcon
                 className={`w-4 h-4 ${repeat !== "off" ? "text-accent" : "text-muted hover:text-foreground"}`}
@@ -187,24 +233,36 @@ export function BottomPlayer() {
         {/* Right Tools */}
         <div className="hidden md:flex items-center justify-end gap-3 w-1/4 min-w-[200px]">
           {session?.user && currentTrack && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => toggleLike(currentTrack.id)}
-            >
-              <Heart
-                className={`w-5 h-5 transition-colors ${
-                  isLiked
-                    ? "text-accent fill-accent"
-                    : "text-muted hover:text-foreground"
-                }`}
-              />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toggleLike(currentTrack.id)}
+                aria-label={isLiked ? "Unlike track" : "Like track"}
+              >
+                <Heart
+                  className={`w-5 h-5 transition-colors ${
+                    isLiked
+                      ? "text-accent fill-accent"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setAddModalOpen(true)}
+                aria-label="Add to playlist"
+              >
+                <Plus className="w-5 h-5 text-muted hover:text-foreground" />
+              </Button>
+            </>
           )}
           <div className="flex items-center gap-2 w-28">
             <button
               onClick={toggleMute}
               className="text-muted hover:text-foreground transition-colors"
+              aria-label={volume === 0 ? "Unmute" : "Mute"}
             >
               {volume === 0 ? (
                 <VolumeX className="w-5 h-5" />
@@ -225,6 +283,14 @@ export function BottomPlayer() {
           </div>
         </div>
       </GlassWindow>
+
+      {currentTrack && (
+        <AddToPlaylistModal
+          trackId={currentTrack.id}
+          open={addModalOpen}
+          onClose={() => setAddModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

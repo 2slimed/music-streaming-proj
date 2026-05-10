@@ -140,6 +140,62 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** Extract unique (albumName, artists) pairs from tracks and populate the Album table. */
+async function seedAlbums() {
+  const tracks = await prisma.track.findMany({
+    select: { albumName: true, artists: true, coverUrl: true },
+  });
+
+  // Deduplicate by (name, artists) key; keep first coverUrl seen
+  const albumMap = new Map<string, { name: string; artists: string; coverUrl: string | null }>();
+  for (const t of tracks) {
+    const name = t.albumName.trim();
+    const artists = t.artists.trim();
+    if (!name || !artists) continue;
+    const key = name + "|||" + artists;
+    if (!albumMap.has(key)) {
+      albumMap.set(key, { name, artists, coverUrl: t.coverUrl });
+    } else if (!albumMap.get(key)!.coverUrl && t.coverUrl) {
+      albumMap.get(key)!.coverUrl = t.coverUrl;
+    }
+  }
+
+  console.log(`\nFound ${albumMap.size} unique albums. Seeding...`);
+
+  let seeded = 0;
+  for (const [, album] of albumMap) {
+    // Check if album already exists before inserting (no unique constraint)
+    const existing = await prisma.album.findFirst({
+      where: { name: album.name, artists: album.artists },
+    });
+
+    if (existing) {
+      // Update coverUrl if missing
+      if (!existing.coverUrl && album.coverUrl) {
+        await prisma.album.update({
+          where: { id: existing.id },
+          data: { coverUrl: album.coverUrl },
+        });
+      }
+    } else {
+      await prisma.album.create({
+        data: {
+          name: album.name,
+          artists: album.artists,
+          coverUrl: album.coverUrl,
+        },
+      });
+    }
+
+    seeded++;
+    if (seeded % 10 === 0) {
+      process.stdout.write(`\r  Seeded ${seeded}/${albumMap.size} albums...`);
+    }
+  }
+
+  console.log(`\nSeeded ${seeded} albums.`);
+}
+
 async function main() {
   const csvPath = path.resolve(__dirname, "../data/dataset.csv");
 
@@ -227,6 +283,9 @@ async function main() {
 
   // ---- Phase 2: Seed Artist table from Deezer ----------------------------
   await seedArtists();
+
+  // ---- Phase 3: Seed Album table from track data ------------------------
+  await seedAlbums();
 }
 
 /** Search Deezer for an artist by name and return metadata. */

@@ -3,19 +3,37 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
-import { PlayCircle, Library, Menu, Music2, Search, Plus, X } from "lucide-react";
+import { PlaylistModal } from "@/components/ui/PlaylistModal";
+import { PlayCircle, Library, Menu, Music2, Search, Plus, X, Disc3 } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { api } from "@/lib/api";
-import type { Playlist } from "@/types/api";
+import type { Playlist, SavedAlbum } from "@/types/api";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [creatingPlaylist, setCreatingPlaylist] = useState(false);
+  const queryClient = useQueryClient();
+
+  const createMutation = useMutation({
+    mutationFn: (data: { name: string; description: string; coverUrl: string; privacy: "PUBLIC" | "PRIVATE" }) =>
+      api.playlists.create({
+        name: data.name,
+        description: data.description || undefined,
+        coverUrl: data.coverUrl || undefined,
+        privacy: data.privacy,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
+      setCreatingPlaylist(false);
+    },
+  });
 
   const { data: playlistsData } = useQuery({
     queryKey: ["sidebar-playlists"],
@@ -23,9 +41,17 @@ export function Sidebar() {
     enabled: !!session?.user,
   });
 
+  const { data: savedAlbumsData } = useQuery({
+    queryKey: ["sidebar-saved-albums"],
+    queryFn: () => api.library.albums.list({ limit: 20 }),
+    enabled: !!session?.user,
+  });
+
   const userPlaylists = playlistsData?.data.filter(
     (p: Playlist) => p.userId === session?.user?.id,
   );
+
+  const savedAlbums = savedAlbumsData?.data ?? [];
 
   function isActive(path: string) {
     return pathname === path;
@@ -67,25 +93,36 @@ export function Sidebar() {
               <Typography variant="caption" color="muted" className="text-xs uppercase tracking-wider font-semibold">
                 Playlists
               </Typography>
-              <Link href="/library" onClick={() => setIsMobileOpen(false)}>
+              <button
+                type="button"
+                aria-label="New playlist"
+                onClick={() => setCreatingPlaylist(true)}
+              >
                 <Plus className="w-4 h-4 text-muted hover:text-foreground transition-colors cursor-pointer" />
-              </Link>
+              </button>
             </div>
             {userPlaylists?.map((playlist: Playlist) => (
               <Link
                 href={`/playlist/${playlist.id}`}
                 key={playlist.id}
-                className="w-full block"
+                className="w-full flex items-center gap-3 overflow-hidden"
                 onClick={() => setIsMobileOpen(false)}
               >
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start text-muted truncate ${
+                <span className={`flex items-center gap-3 w-full truncate py-2 px-3 rounded-full text-sm font-medium text-muted hover:bg-surface-hover hover:text-foreground transition-colors ${
                     pathname === `/playlist/${playlist.id}` ? "bg-white/10 text-foreground" : ""
                   }`}
                 >
-                  {playlist.name}
-                </Button>
+                  {playlist.coverUrl ? (
+                    <img
+                      src={playlist.coverUrl}
+                      alt={playlist.name}
+                      className="w-6 h-6 rounded shrink-0 object-cover"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded shrink-0 bg-gradient-to-tr from-accent/40 to-purple-600/40" />
+                  )}
+                  <span className="truncate">{playlist.name}</span>
+                </span>
               </Link>
             ))}
             {userPlaylists?.length === 0 && (
@@ -95,11 +132,53 @@ export function Sidebar() {
             )}
           </div>
         )}
+
+        {session?.user && savedAlbums.length > 0 && (
+          <div className="space-y-1 mt-4">
+            <div className="flex items-center justify-between px-2 mb-2">
+              <Typography variant="caption" color="muted" className="text-xs uppercase tracking-wider font-semibold">
+                Saved Albums
+              </Typography>
+            </div>
+            {savedAlbums.map((saved: SavedAlbum) => (
+              <Link
+                href={`/album/${encodeURIComponent(saved.album.name)}`}
+                key={saved.id}
+                className="w-full flex items-center gap-3 overflow-hidden"
+                onClick={() => setIsMobileOpen(false)}
+              >
+                <span className={`flex items-center gap-3 w-full truncate py-2 px-3 rounded-full text-sm font-medium text-muted hover:bg-surface-hover hover:text-foreground transition-colors ${
+                    pathname === `/album/${encodeURIComponent(saved.album.name)}` ? "bg-white/10 text-foreground" : ""
+                  }`}
+                >
+                  {saved.album.coverUrl ? (
+                    <img
+                      src={saved.album.coverUrl}
+                      alt={saved.album.name}
+                      className="w-6 h-6 rounded shrink-0 object-cover"
+                    />
+                  ) : (
+                    <Disc3 className="w-4 h-4 shrink-0 text-muted" />
+                  )}
+                  <span className="truncate">{saved.album.name}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
 
       <div className="border-t border-white/5">
         <UserMenu />
       </div>
+
+      <PlaylistModal
+        mode="create"
+        open={creatingPlaylist}
+        onClose={() => setCreatingPlaylist(false)}
+        onSave={(data) => createMutation.mutate(data)}
+        isSaving={createMutation.isPending}
+      />
     </>
   );
 
