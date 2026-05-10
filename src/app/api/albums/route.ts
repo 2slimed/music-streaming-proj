@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/albums
- * List albums with optional pagination.
+ * List albums with optional pagination and exact name filtering.
  *
  * Query params:
  *   page  - page number (default 1)
  *   limit - items per page (default 20, max 100)
  *   sort  - "recent" | "popular" | "name" (default "name")
+ *   name  - exact album name match
  */
 export async function GET(request: NextRequest) {
   try {
@@ -18,9 +19,11 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 20));
     const sort = searchParams.get("sort") ?? "name";
+    const name = searchParams.get("name")?.trim();
+    const where = name ? { name } : undefined;
 
     // Popular sort: rank albums by average track popularity using a single raw SQL query
-    if (sort === "popular") {
+    if (sort === "popular" && !name) {
       const total = await prisma.album.count();
 
       const albums = await prisma.$queryRaw<
@@ -55,11 +58,12 @@ export async function GET(request: NextRequest) {
 
     const [albums, total] = await Promise.all([
       prisma.album.findMany({
+        where,
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
-      prisma.album.count(),
+      prisma.album.count({ where }),
     ]);
 
     return NextResponse.json({

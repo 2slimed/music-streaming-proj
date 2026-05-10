@@ -31,8 +31,8 @@ export default function AlbumPage({
 
   // Fetch user's saved albums to derive saved state
   const { data: savedAlbumsData } = useQuery({
-    queryKey: ["saved-albums"],
-    queryFn: () => api.library.albums.list({ limit: 200 }),
+    queryKey: ["saved-albums", albumName],
+    queryFn: () => api.library.albums.list({ albumName, limit: 1 }),
     enabled: !!session?.user,
   });
 
@@ -65,9 +65,8 @@ export default function AlbumPage({
       if (isSaved && savedEntry) {
         await api.library.albums.unsave(savedEntry.albumId);
       } else {
-        // Resolve album id from the albums list — find by name
-        const allAlbums = await api.albums.list({ limit: 200 });
-        const album = allAlbums.data.find((a) => a.name === albumName);
+        const matchingAlbums = await api.albums.list({ name: albumName, limit: 1 });
+        const album = matchingAlbums.data[0];
         if (!album) {
           console.error("Album record not found in DB for name:", albumName);
           return;

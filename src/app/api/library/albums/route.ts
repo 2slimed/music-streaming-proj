@@ -17,16 +17,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 50));
+    const albumName = searchParams.get("albumName")?.trim();
+    const where = {
+      userId: session.user.id,
+      ...(albumName ? { album: { name: albumName } } : {}),
+    };
 
     const [items, total] = await Promise.all([
       prisma.savedAlbum.findMany({
-        where: { userId: session.user.id },
+        where,
         include: { album: true },
         orderBy: { savedAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      prisma.savedAlbum.count({ where: { userId: session.user.id } }),
+      prisma.savedAlbum.count({ where }),
     ]);
 
     return NextResponse.json({

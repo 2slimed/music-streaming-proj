@@ -138,7 +138,7 @@ export const api = {
       });
     },
     albums: {
-      list(params?: { page?: number; limit?: number }) {
+      list(params?: { page?: number; limit?: number; albumName?: string }) {
         return apiFetch<PaginatedResponse<SavedAlbum>>(
           `/api/library/albums${qs(params ?? {})}`,
         );
@@ -159,7 +159,7 @@ export const api = {
   },
 
   albums: {
-    list(params?: { page?: number; limit?: number; sort?: string }) {
+    list(params?: { page?: number; limit?: number; sort?: string; name?: string }) {
       return apiFetch<PaginatedResponse<Album>>(
         `/api/albums${qs(params ?? {})}`,
       );
