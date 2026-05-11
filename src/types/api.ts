@@ -78,7 +78,6 @@ export interface UserProfile {
   name: string | null;
   email: string | null;
   image: string | null;
-  role: "USER" | "ARTIST";
   createdAt: string;
   _count: {
     playlists: number;

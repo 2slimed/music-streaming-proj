@@ -5,8 +5,7 @@
 //   * The Track model stores `artists` as a plain string (semicolon-separated)
 //     mirroring the Kaggle Spotify dataset. The Artist table stores metadata
 //     (image, bio) and is loosely coupled via name matching.
-//   * The User model carries a `role` enum so the same table can represent
-//     both regular listeners and artist profiles in the future.
+//   * User stays generic; app treats all authenticated users as listeners.
 //   * Tracks are sourced from the Kaggle dataset and enriched at runtime
 //     via the Spotify Web API (preview URLs, cover art, etc.).  No audio
 //     files are stored in cloud storage.
@@ -22,11 +21,6 @@ datasource db {
 }
 
 // ---- Enums ----------------------------------------------------------------
-
-enum UserRole {
-  USER
-  ARTIST
-}
 
 enum PlaylistPrivacy {
   PUBLIC
@@ -80,7 +74,6 @@ model User {
   emailVerified DateTime?
   image         String?
   passwordHash  String?
-  role          UserRole  @default(USER)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

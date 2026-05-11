@@ -71,7 +71,6 @@ export async function GET(
         previewUrl = null;
       }
     }
-    }
 
     if (!previewUrl) {
       return NextResponse.json(
