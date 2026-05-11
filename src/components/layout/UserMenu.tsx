@@ -32,20 +32,22 @@ export function UserMenu() {
   return (
     <div className="px-4 py-3 space-y-2">
       <div className="flex items-center gap-3 px-2">
-        {session.user.image ? (
-          <img
-            src={session.user.image}
-            alt={session.user.name ?? "User"}
-            className="w-8 h-8 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
-            <User className="w-4 h-4 text-accent" />
-          </div>
-        )}
-        <Typography variant="caption" className="font-semibold truncate flex-1">
-          {session.user.name ?? session.user.email}
-        </Typography>
+        <Link href="/profile" className="flex items-center gap-3 min-w-0 flex-1">
+          {session.user.image ? (
+            <img
+              src={session.user.image}
+              alt={session.user.name ?? "User"}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+              <User className="w-4 h-4 text-accent" />
+            </div>
+          )}
+          <Typography variant="caption" className="font-semibold truncate flex-1">
+            {session.user.name ?? session.user.email}
+          </Typography>
+        </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
           className="text-muted hover:text-foreground transition-colors"

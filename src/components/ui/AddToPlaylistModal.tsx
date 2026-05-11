@@ -62,33 +62,53 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
 
   const addMutation = useMutation({
     mutationFn: (playlistId: string) => api.playlists.addTrack(playlistId, trackId),
-    onSuccess: (_data, playlistId) => {
+    onMutate: async (playlistId) => {
       setAddedPlaylists((prev) => new Set(prev).add(playlistId));
       setRemovedPlaylists((prev) => {
         const next = new Set(prev);
         next.delete(playlistId);
         return next;
       });
+      return { playlistId };
+    },
+    onSuccess: (_data, playlistId) => {
       queryClient.invalidateQueries({ queryKey: ["playlists-containing", trackId] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
       queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
       queryClient.invalidateQueries({ queryKey: ["playlist"] });
     },
+    onError: (_error, playlistId) => {
+      setAddedPlaylists((prev) => {
+        const next = new Set(prev);
+        next.delete(playlistId);
+        return next;
+      });
+    },
   });
 
   const removeMutation = useMutation({
     mutationFn: (playlistId: string) => api.playlists.removeTrack(playlistId, trackId),
-    onSuccess: (_data, playlistId) => {
+    onMutate: async (playlistId) => {
       setRemovedPlaylists((prev) => new Set(prev).add(playlistId));
       setAddedPlaylists((prev) => {
         const next = new Set(prev);
         next.delete(playlistId);
         return next;
       });
+      return { playlistId };
+    },
+    onSuccess: (_data, playlistId) => {
       queryClient.invalidateQueries({ queryKey: ["playlists-containing", trackId] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
       queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
       queryClient.invalidateQueries({ queryKey: ["playlist"] });
+    },
+    onError: (_error, playlistId) => {
+      setRemovedPlaylists((prev) => {
+        const next = new Set(prev);
+        next.delete(playlistId);
+        return next;
+      });
     },
   });
 
@@ -97,6 +117,10 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
     if (removedPlaylists.has(playlistId)) return false;
     if (addedPlaylists.has(playlistId)) return true;
     return serverHas;
+  }
+
+  function isBusy(playlistId: string): boolean {
+    return addMutation.isPending || removeMutation.isPending;
   }
 
   async function handleCreateAndAdd() {
@@ -162,7 +186,7 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
         <div className="space-y-1">
           {userPlaylists.map((p: Playlist) => {
             const added = isInPlaylist(p.id);
-            const busy = addMutation.isPending || removeMutation.isPending;
+            const busy = isBusy(p.id);
             return (
               <button
                 key={p.id}
@@ -192,7 +216,9 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
                     {p._count?.tracks ?? 0} tracks
                   </Typography>
                 </div>
-                {added ? (
+                {busy ? (
+                  <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                ) : added ? (
                   <div className="flex items-center gap-1 shrink-0">
                     <Check className="w-4 h-4 text-green-400" />
                     <Minus className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />

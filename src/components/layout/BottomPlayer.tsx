@@ -18,7 +18,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
-import { useLibraryStore } from "@/stores/libraryStore";
+import { useTrackLike } from "@/hooks/useTrackLike";
 import { useSession } from "next-auth/react";
 import { AddToPlaylistModal } from "@/components/ui/AddToPlaylistModal";
 import Link from "next/link";
@@ -48,10 +48,7 @@ export function BottomPlayer() {
   const toggleMute = usePlayerStore((s) => s.toggleMute);
 
   const { data: session } = useSession();
-  const isLiked = useLibraryStore((s) =>
-    currentTrack ? s.isLiked(currentTrack.id) : false,
-  );
-  const toggleLike = useLibraryStore((s) => s.toggleLike);
+  const { isLiked, toggleLike } = useTrackLike(currentTrack?.id);
   const [addModalOpen, setAddModalOpen] = useState(false);
 
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -157,7 +154,7 @@ export function BottomPlayer() {
             {session?.user && currentTrack && (
               <>
                 <button
-                  onClick={(e) => { e.stopPropagation(); toggleLike(currentTrack.id); }}
+                  onClick={(e) => { e.stopPropagation(); toggleLike(); }}
                   className="md:hidden text-muted hover:text-foreground transition-colors"
                 >
                   <Heart
@@ -237,7 +234,7 @@ export function BottomPlayer() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => toggleLike(currentTrack.id)}
+                onClick={() => toggleLike()}
                 aria-label={isLiked ? "Unlike track" : "Like track"}
               >
                 <Heart

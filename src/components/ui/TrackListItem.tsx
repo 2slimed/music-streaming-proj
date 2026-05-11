@@ -5,7 +5,7 @@ import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { Play, Pause, Heart, Plus } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
-import { useLibraryStore } from "@/stores/libraryStore";
+import { useTrackLike } from "@/hooks/useTrackLike";
 import { useSession } from "next-auth/react";
 import { AddToPlaylistModal } from "@/components/ui/AddToPlaylistModal";
 import type { Track } from "@/types/api";
@@ -39,8 +39,7 @@ export function TrackListItem({
   const togglePlay = usePlayerStore((s) => s.togglePlay);
 
   const { data: session } = useSession();
-  const isLiked = useLibraryStore((s) => s.isLiked(track.id));
-  const toggleLike = useLibraryStore((s) => s.toggleLike);
+  const { isLiked, toggleLike } = useTrackLike(track.id);
 
   const [addModalOpen, setAddModalOpen] = useState(false);
 
@@ -152,7 +151,7 @@ export function TrackListItem({
               className="opacity-0 group-hover:opacity-100 transition-opacity mr-2"
               onClick={(e) => {
                 e.stopPropagation();
-                toggleLike(track.id);
+                toggleLike();
               }}
             >
               <Heart

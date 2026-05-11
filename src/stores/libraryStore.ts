@@ -43,6 +43,7 @@ export const useLibraryStore = create<LibraryState & LibraryActions>(
     toggleLike: async (trackId: string) => {
       const { likedTrackIds } = get();
       const wasLiked = likedTrackIds.has(trackId);
+      const previous = new Set(likedTrackIds);
 
       const next = new Set(likedTrackIds);
       if (wasLiked) {
@@ -60,13 +61,7 @@ export const useLibraryStore = create<LibraryState & LibraryActions>(
         }
         queryClient.invalidateQueries({ queryKey: ["library"] });
       } catch {
-        const rollback = new Set(get().likedTrackIds);
-        if (wasLiked) {
-          rollback.add(trackId);
-        } else {
-          rollback.delete(trackId);
-        }
-        set({ likedTrackIds: rollback });
+        set({ likedTrackIds: previous });
       }
     },
 
