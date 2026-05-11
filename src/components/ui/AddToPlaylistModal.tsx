@@ -26,7 +26,6 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
   const [creating, setCreating] = useState(false);
   const [addedPlaylists, setAddedPlaylists] = useState<Set<string>>(new Set());
   const [removedPlaylists, setRemovedPlaylists] = useState<Set<string>>(new Set());
-  const [pendingPlaylists, setPendingPlaylists] = useState<Set<string>>(new Set());
 
   const { data: playlistsData } = useQuery({
     queryKey: ["playlists"],
@@ -57,7 +56,6 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
     if (open) {
       setAddedPlaylists(new Set());
       setRemovedPlaylists(new Set());
-      setPendingPlaylists(new Set());
       setNewName("");
     }
   }, [open]);
@@ -65,7 +63,6 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
   const addMutation = useMutation({
     mutationFn: (playlistId: string) => api.playlists.addTrack(playlistId, trackId),
     onMutate: async (playlistId) => {
-      setPendingPlaylists((prev) => new Set(prev).add(playlistId));
       setAddedPlaylists((prev) => new Set(prev).add(playlistId));
       setRemovedPlaylists((prev) => {
         const next = new Set(prev);
@@ -75,22 +72,12 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
       return { playlistId };
     },
     onSuccess: (_data, playlistId) => {
-      setPendingPlaylists((prev) => {
-        const next = new Set(prev);
-        next.delete(playlistId);
-        return next;
-      });
       queryClient.invalidateQueries({ queryKey: ["playlists-containing", trackId] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
       queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
       queryClient.invalidateQueries({ queryKey: ["playlist"] });
     },
     onError: (_error, playlistId) => {
-      setPendingPlaylists((prev) => {
-        const next = new Set(prev);
-        next.delete(playlistId);
-        return next;
-      });
       setAddedPlaylists((prev) => {
         const next = new Set(prev);
         next.delete(playlistId);
@@ -102,7 +89,6 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
   const removeMutation = useMutation({
     mutationFn: (playlistId: string) => api.playlists.removeTrack(playlistId, trackId),
     onMutate: async (playlistId) => {
-      setPendingPlaylists((prev) => new Set(prev).add(playlistId));
       setRemovedPlaylists((prev) => new Set(prev).add(playlistId));
       setAddedPlaylists((prev) => {
         const next = new Set(prev);
@@ -112,22 +98,12 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
       return { playlistId };
     },
     onSuccess: (_data, playlistId) => {
-      setPendingPlaylists((prev) => {
-        const next = new Set(prev);
-        next.delete(playlistId);
-        return next;
-      });
       queryClient.invalidateQueries({ queryKey: ["playlists-containing", trackId] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
       queryClient.invalidateQueries({ queryKey: ["sidebar-playlists"] });
       queryClient.invalidateQueries({ queryKey: ["playlist"] });
     },
     onError: (_error, playlistId) => {
-      setPendingPlaylists((prev) => {
-        const next = new Set(prev);
-        next.delete(playlistId);
-        return next;
-      });
       setRemovedPlaylists((prev) => {
         const next = new Set(prev);
         next.delete(playlistId);
@@ -144,7 +120,7 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
   }
 
   function isBusy(playlistId: string): boolean {
-    return pendingPlaylists.has(playlistId) || addMutation.isPending || removeMutation.isPending;
+    return addMutation.isPending || removeMutation.isPending;
   }
 
   async function handleCreateAndAdd() {
@@ -240,13 +216,13 @@ export function AddToPlaylistModal({ trackId, open, onClose }: Props) {
                     {p._count?.tracks ?? 0} tracks
                   </Typography>
                 </div>
-                 {busy ? (
-                   <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
-                 ) : added ? (
-                   <div className="flex items-center gap-1 shrink-0">
-                     <Check className="w-4 h-4 text-green-400" />
-                     <Minus className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-                   </div>
+                {busy ? (
+                  <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                ) : added ? (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Check className="w-4 h-4 text-green-400" />
+                    <Minus className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                 ) : (
                   <Plus className="w-4 h-4 text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                 )}
