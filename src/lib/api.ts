@@ -11,7 +11,7 @@ import type {
   SearchResults,
 } from "@/types/api";
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
@@ -33,6 +33,9 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("melodymix:unauthorized"));
+    }
     throw new ApiError(res.status, body.error ?? res.statusText);
   }
 

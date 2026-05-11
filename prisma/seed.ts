@@ -204,7 +204,7 @@ async function main() {
     process.exit(1);
   }
 
-  const rows = parseCsv(csvPath);
+  const rows = parseCsv(csvPath).slice(0, 200);
   console.log(`Parsed ${rows.length} rows from CSV. Seeding...`);
 
   let seeded = 0;
