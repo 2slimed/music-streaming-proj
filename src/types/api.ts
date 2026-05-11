@@ -83,20 +83,40 @@ export interface UserProfile {
   _count: {
     playlists: number;
     libraryItems: number;
-    follows: number;
-    followers: number;
   };
 }
 
-export interface RecentPlay {
+export interface Album {
+  id: string;
+  name: string;
+  artists: string;
+  coverUrl: string | null;
+  createdAt: string;
+}
+
+export interface Artist {
+  id: string;
+  name: string;
+  bio: string | null;
+  imageUrl: string | null;
+  deezerArtistId: string | null;
+  nbFan: number | null;
+  nbAlbum: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedAlbum {
   id: string;
   userId: string;
-  trackId: string;
-  playedAt: string;
-  track: Track;
+  albumId: string;
+  savedAt: string;
+  album: Album;
 }
 
 export interface SearchResults {
   tracks?: Track[];
+  albums?: Album[];
+  artists?: Artist[];
   playlists?: Playlist[];
 }

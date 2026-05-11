@@ -1,10 +1,12 @@
 import type {
   Track,
+  Album,
+  Artist,
   Playlist,
   PlaylistWithTracks,
   LibraryItem,
+  SavedAlbum,
   UserProfile,
-  RecentPlay,
   PaginatedResponse,
   SearchResults,
 } from "@/types/api";
@@ -77,7 +79,7 @@ export const api = {
         `/api/playlists/${encodeURIComponent(id)}`,
       );
     },
-    create(body: { name: string; description?: string; privacy?: string }) {
+    create(body: { name: string; description?: string; privacy?: string; coverUrl?: string }) {
       return apiFetch<Playlist>("/api/playlists", {
         method: "POST",
         body: JSON.stringify(body),
@@ -85,7 +87,7 @@ export const api = {
     },
     update(
       id: string,
-      body: { name?: string; description?: string; privacy?: string },
+      body: { name?: string; description?: string; privacy?: string; coverUrl?: string | null },
     ) {
       return apiFetch<Playlist>(`/api/playlists/${encodeURIComponent(id)}`, {
         method: "PATCH",
@@ -110,6 +112,11 @@ export const api = {
         { method: "DELETE", body: JSON.stringify({ trackId }) },
       );
     },
+    containing(trackId: string) {
+      return apiFetch<{ data: string[] }>(
+        `/api/playlists/containing?trackId=${encodeURIComponent(trackId)}`
+      );
+    },
   },
 
   library: {
@@ -130,6 +137,44 @@ export const api = {
         body: JSON.stringify({ trackId }),
       });
     },
+    albums: {
+      list(params?: { page?: number; limit?: number; albumName?: string }) {
+        return apiFetch<PaginatedResponse<SavedAlbum>>(
+          `/api/library/albums${qs(params ?? {})}`,
+        );
+      },
+      save(albumId: string) {
+        return apiFetch<SavedAlbum>("/api/library/albums", {
+          method: "POST",
+          body: JSON.stringify({ albumId }),
+        });
+      },
+      unsave(albumId: string) {
+        return apiFetch<{ success: boolean }>("/api/library/albums", {
+          method: "DELETE",
+          body: JSON.stringify({ albumId }),
+        });
+      },
+    },
+  },
+
+  albums: {
+    list(params?: { page?: number; limit?: number; sort?: string; name?: string }) {
+      return apiFetch<PaginatedResponse<Album>>(
+        `/api/albums${qs(params ?? {})}`,
+      );
+    },
+  },
+
+  artists: {
+    list(params?: { page?: number; limit?: number }) {
+      return apiFetch<PaginatedResponse<Artist>>(
+        `/api/artists${qs(params ?? {})}`,
+      );
+    },
+    get(name: string) {
+      return apiFetch<Artist>(`/api/artists/${encodeURIComponent(name)}`);
+    },
   },
 
   search(query: string, type?: string, limit?: number) {
@@ -147,11 +192,6 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(body),
       });
-    },
-    recentPlays(limit?: number) {
-      return apiFetch<{ data: RecentPlay[] }>(
-        `/api/profile/recent-plays${qs({ limit })}`,
-      );
     },
   },
 

@@ -2,9 +2,9 @@
 // MelodyMix – Prisma Schema  (PostgreSQL)
 // ---------------------------------------------------------------------------
 // Architectural decisions
-//   * Artists are NOT a separate table. The Track model stores `artists` as a
-//     plain string (comma-separated) mirroring the Kaggle Spotify dataset.
-//     A full many-to-many Artist <-> Track relation is out of scope for V1.
+//   * The Track model stores `artists` as a plain string (semicolon-separated)
+//     mirroring the Kaggle Spotify dataset. The Artist table stores metadata
+//     (image, bio) and is loosely coupled via name matching.
 //   * The User model carries a `role` enum so the same table can represent
 //     both regular listeners and artist profiles in the future.
 //   * Tracks are sourced from the Kaggle dataset and enriched at runtime
@@ -89,15 +89,13 @@ model User {
   sessions     Session[]
   playlists    Playlist[]
   libraryItems LibraryItem[]
-  recentPlays  RecentPlay[]
-  follows      UserFollows[] @relation("follower")
-  followers    UserFollows[] @relation("following")
+  savedAlbums  SavedAlbum[]
 }
 
 model Track {
   id           String  @id @default(cuid())
   trackId      String  @unique // original Spotify / dataset track_id
-  artists      String  // comma-separated artist names from dataset
+  artists      String  // semicolon-separated artist names from dataset
   albumName    String
   trackName    String
 
@@ -131,7 +129,6 @@ model Track {
   // Relations
   playlistTracks PlaylistTrack[]
   libraryItems   LibraryItem[]
-  recentPlays    RecentPlay[]
 
   @@index([trackName])
   @@index([artists])
@@ -147,7 +144,36 @@ model Album {
 
   createdAt DateTime @default(now())
 
+  savedBy SavedAlbum[]
+
   @@index([name])
+}
+
+model SavedAlbum {
+  id      String @id @default(cuid())
+  userId  String
+  albumId String
+
+  savedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, albumId])
+  @@index([userId])
+}
+
+model Artist {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  bio            String?  @db.Text
+  imageUrl       String?
+  deezerArtistId String?  @unique
+  nbFan          Int?
+  nbAlbum        Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Playlist {
@@ -183,20 +209,6 @@ model PlaylistTrack {
   @@index([playlistId])
 }
 
-model UserFollows {
-  id          String @id @default(cuid())
-  followerId  String
-  followingId String
-
-  createdAt DateTime @default(now())
-
-  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
-}
 
 model LibraryItem {
   id      String @id @default(cuid())
@@ -209,19 +221,5 @@ model LibraryItem {
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
-  @@index([userId])
-}
-
-model RecentPlay {
-  id      String @id @default(cuid())
-  userId  String
-  trackId String
-
-  playedAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
-
-  @@index([userId, playedAt(sort: Desc)])
   @@index([userId])
 }

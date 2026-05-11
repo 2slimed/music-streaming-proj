@@ -7,8 +7,11 @@ import type { NextRequest } from "next/server";
  * Public routes (no auth required):
  *   - /api/auth/**        – NextAuth handlers
  *   - /api/tracks (GET)   – browsing the catalogue
- *   - /api/playlists (GET) – browsing public playlists
+ *   - /api/playlists (GET)      – browsing public playlists
+ *   - /api/playlists/:id (GET)  – viewing a single playlist (NOT /containing)
  *   - /api/search (GET)   – searching
+ *   - /api/albums (GET)   – browsing albums
+ *   - /api/artists (GET)  – browsing artists
  *
  * All other /api/** routes require a session cookie.
  * Pages are NOT blocked here; auth checks happen at the component level.
@@ -20,6 +23,8 @@ const PUBLIC_API_ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/tracks", methods: ["GET"] },
   { path: "/api/search", methods: ["GET"] },
   { path: "/api/playlists", methods: ["GET"] },
+  { path: "/api/albums", methods: ["GET"] },
+  { path: "/api/artists", methods: ["GET"] },
 ];
 
 function isPublicApiRoute(pathname: string, method: string): boolean {
@@ -39,7 +44,20 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
       if (
         route.path === "/api/playlists" &&
         pathname.startsWith("/api/playlists/") &&
-        !pathname.slice("/api/playlists/".length).includes("/")
+        !pathname.slice("/api/playlists/".length).includes("/") &&
+        pathname !== "/api/playlists/containing"
+      ) {
+        return true;
+      }
+      if (
+        route.path === "/api/albums" &&
+        pathname.startsWith("/api/albums/")
+      ) {
+        return true;
+      }
+      if (
+        route.path === "/api/artists" &&
+        pathname.startsWith("/api/artists/")
       ) {
         return true;
       }
