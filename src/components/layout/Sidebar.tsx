@@ -192,7 +192,7 @@ export function Sidebar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/5 bg-background/90 px-4 backdrop-blur-md md:hidden">
+      <header className="fixed inset-x-0 top-0 z-[65] flex h-16 items-center justify-between border-b border-white/5 bg-background/90 px-4 backdrop-blur-md md:hidden">
         <Link href="/" className="min-w-0">
           <Typography variant="h4" className="flex items-center gap-2 truncate">
             <Music2 className="h-6 w-6 shrink-0 text-accent" />
@@ -214,13 +214,13 @@ export function Sidebar() {
         <button
           type="button"
           aria-label="Close navigation menu"
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm md:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[82vw] flex-col border-r border-white/10 bg-surface shadow-2xl transition-transform duration-300 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-[70] flex w-72 max-w-[82vw] flex-col border-r border-white/10 bg-surface shadow-2xl transition-transform duration-300 md:hidden ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

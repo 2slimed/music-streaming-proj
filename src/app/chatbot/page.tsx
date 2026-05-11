@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Bot, Loader2, Music, Plus, Save, Send, Sparkles, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { GlassWindow } from "@/components/ui/GlassWindow";
@@ -8,6 +9,8 @@ import { Typography } from "@/components/ui/Typography";
 import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { api } from "@/lib/api";
+import { usePlayerStore } from "@/stores/playerStore";
 
 type ChatMessage = {
   id: string;
@@ -47,6 +50,97 @@ function createMessage(role: ChatMessage["role"], content: string, isStreaming?:
   };
 }
 
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const pattern = /(\*\*([^*]+)\*\*|__([^_]+)__|\*([^*]+)\*|_([^_]+)_|<u>(.*?)<\/u>|\+\+(.+?)\+\+|~~(.+?)~~)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const key = `${keyPrefix}-${nodes.length}`;
+    if (match[2] || match[3]) {
+      nodes.push(
+        <strong key={key} className="font-semibold text-white">
+          {match[2] ?? match[3]}
+        </strong>,
+      );
+    } else if (match[4] || match[5]) {
+      nodes.push(
+        <em key={key} className="italic">
+          {match[4] ?? match[5]}
+        </em>,
+      );
+    } else if (match[6] || match[7]) {
+      nodes.push(
+        <span key={key} className="underline decoration-accent/70 underline-offset-4">
+          {match[6] ?? match[7]}
+        </span>,
+      );
+    } else if (match[8]) {
+      nodes.push(
+        <span key={key} className="line-through decoration-muted">
+          {match[8]}
+        </span>,
+      );
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  const lines = content.split("\n");
+
+  return (
+    <div className="space-y-2">
+      {lines.map((line, index) => {
+        if (!line.trim()) {
+          return <div key={index} className="h-1" />;
+        }
+
+        const bulletMatch = line.match(/^\s*[-*]\s+(.+)$/);
+        if (bulletMatch) {
+          return (
+            <div key={index} className="flex gap-2">
+              <span className="mt-0.5 text-accent">•</span>
+              <span>{renderInlineMarkdown(bulletMatch[1], `${index}-bullet`)}</span>
+            </div>
+          );
+        }
+
+        const numberedMatch = line.match(/^\s*(\d+)\.\s+(.+)$/);
+        if (numberedMatch) {
+          return (
+            <div key={index} className="flex gap-2">
+              <span className="min-w-5 text-accent">{numberedMatch[1]}.</span>
+              <span>{renderInlineMarkdown(numberedMatch[2], `${index}-numbered`)}</span>
+            </div>
+          );
+        }
+
+        return <p key={index}>{renderInlineMarkdown(line, `${index}-line`)}</p>;
+      })}
+    </div>
+  );
+}
+
+function splitArtistNames(artists: string): string[] {
+  return artists
+    .split(";")
+    .map((artist) => artist.trim())
+    .filter(Boolean);
+}
+
 export default function ChatbotPage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
@@ -56,7 +150,10 @@ export default function ChatbotPage() {
   const [playlist, setPlaylist] = useState<PlaylistData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPlaylistId, setSavedPlaylistId] = useState<string | null>(null);
+  const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const playTrack = usePlayerStore((state) => state.playTrack);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !isLoading, [draft, isLoading]);
 
@@ -102,6 +199,20 @@ export default function ChatbotPage() {
     }
   }
 
+  async function handlePlayGeneratedTrack(trackId: string) {
+    if (playingTrackId) return;
+
+    setPlayingTrackId(trackId);
+    try {
+      const track = await api.tracks.get(trackId);
+      playTrack(track);
+    } catch (err) {
+      console.error("Lỗi phát bài hát gợi ý:", err);
+    } finally {
+      setPlayingTrackId(null);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -114,6 +225,7 @@ export default function ChatbotPage() {
     setIsLoading(true);
     setPlaylist(null);
     setSavedPlaylistId(null);
+    setIsMobilePlaylistOpen(false);
 
     const assistantId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const placeholderMsg: ChatMessage = {
@@ -228,10 +340,11 @@ export default function ChatbotPage() {
   }
 
   return (
-    <div className="min-h-full p-4 md:p-8 lg:p-10">
-      <div className="mx-auto flex min-h-[calc(100vh-10rem)] w-full max-w-5xl flex-col gap-6">
-        <header className="space-y-3">
-          <div className="flex items-center gap-3">
+    <div className="h-[calc(100dvh-14rem)] overflow-hidden p-4 md:h-[calc(100dvh-8rem)] md:min-h-0 md:overflow-hidden md:p-5 lg:p-6 xl:p-8">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-4 md:gap-4 lg:gap-5">
+        <header className="shrink-0 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-accent shadow-[0_0_24px_rgba(250,88,182,0.18)]">
               <Sparkles className="h-5 w-5" />
             </div>
@@ -241,15 +354,25 @@ export default function ChatbotPage() {
               </Typography>
               <Typography variant="h1" className="mt-1">Chatbot</Typography>
             </div>
+            </div>
+            {playlist && playlist.playlist.length > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="xl:hidden shrink-0 gap-2 border border-white/10 bg-white/5 px-3 text-xs"
+                onClick={() => setIsMobilePlaylistOpen((prev) => !prev)}
+              >
+                <Music className="h-4 w-4" />
+                Playlist
+              </Button>
+            )}
           </div>
-          <Typography color="muted" className="max-w-2xl">
-            Trợ lý âm nhạc thông minh — gợi ý bài hát theo tâm trạng, tìm kiếm nghệ sĩ, và tạo playlist. Hỗ trợ bởi Gemini AI.
-          </Typography>
         </header>
 
-        <div className="flex flex-1 gap-6">
+        <div className="flex min-h-0 flex-1 gap-6">
           {/* ─── Chat panel ──────────────────────────────────────── */}
-          <GlassWindow className="flex min-h-[34rem] flex-1 flex-col rounded-2xl" intensity="medium">
+          <GlassWindow className="flex min-h-0 flex-1 flex-col rounded-2xl" intensity="medium">
             <div className="border-b border-white/10 px-5 py-4 md:px-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent">
@@ -268,7 +391,7 @@ export default function ChatbotPage() {
 
             <div
               ref={listRef}
-              className="flex-1 space-y-4 overflow-y-auto px-4 py-5 md:px-6"
+              className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5 md:px-6"
             >
               {messages.map((message) => {
                 const isUser = message.role === "user";
@@ -290,7 +413,7 @@ export default function ChatbotPage() {
                           : "border border-white/10 bg-white/8 text-foreground"
                       }`}
                     >
-                      {message.content}
+                      <MarkdownMessage content={message.content} />
                       {message.isStreaming && (
                         <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-accent align-middle" />
                       )}
@@ -332,8 +455,8 @@ export default function ChatbotPage() {
                     }
                   }}
                   rows={1}
-                  placeholder="Hỏi về playlist, tâm trạng, hoặc tìm bài hát..."
-                  className="max-h-28 min-h-10 flex-1 resize-none bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted"
+                  placeholder="Hỏi nhạc..."
+                  className="max-h-28 min-h-10 flex-1 resize-none overflow-hidden bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted"
                 />
                 <Button type="submit" size="icon" disabled={!canSend} aria-label="Gửi tin nhắn">
                   {isLoading ? (
@@ -347,9 +470,116 @@ export default function ChatbotPage() {
           </GlassWindow>
 
           {/* ─── Playlist sidebar ────────────────────────────────── */}
+          {playlist && playlist.playlist.length > 0 && isMobilePlaylistOpen && (
+            <div className="fixed inset-x-4 bottom-28 z-40 max-h-[46dvh] overflow-hidden xl:hidden">
+              <GlassWindow className="flex max-h-[46dvh] flex-col rounded-2xl border border-white/10 bg-black/80 backdrop-blur-xl" intensity="medium">
+                <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Music className="h-5 w-5 text-accent" />
+                    <Typography variant="h4" className="text-base">
+                      Playlist gợi ý
+                    </Typography>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => setIsMobilePlaylistOpen(false)}
+                  >
+                    Đóng
+                  </Button>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                  {playlist.seedFound && (
+                    <Typography variant="caption" color="muted" className="mb-3 block">
+                      Tương tự: <span className="text-accent">{playlist.seedFound}</span>
+                    </Typography>
+                  )}
+
+                  <div className="space-y-2">
+                    {playlist.playlist.map((track, i) => (
+                      <div
+                        key={`${track.id || track.name}-${i}`}
+                        className="rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <button
+                              type="button"
+                              disabled={playingTrackId === track.id}
+                              onClick={() => handlePlayGeneratedTrack(track.id)}
+                              className="block min-w-0 text-left text-sm font-medium leading-5 text-foreground transition-colors hover:text-accent hover:underline disabled:cursor-wait disabled:text-muted"
+                            >
+                              <span className="line-clamp-2 break-words">{track.name}</span>
+                            </button>
+                            <div className="flex min-w-0 flex-wrap gap-x-1 gap-y-0.5 text-xs leading-5 text-muted">
+                              {splitArtistNames(track.artist).map((artist, artistIndex, artists) => (
+                                <span key={`${track.id}-${artist}`} className="min-w-0">
+                                  <Link
+                                    href={`/artist/${encodeURIComponent(artist)}`}
+                                    className="break-words transition-colors hover:text-accent hover:underline"
+                                  >
+                                    {artist}
+                                  </Link>
+                                  {artistIndex < artists.length - 1 && ","}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {track.similarity && (
+                            <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                              {track.similarity}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 border-t border-white/10 pt-3 space-y-2">
+                    {session?.user ? (
+                      savedPlaylistId ? (
+                        <div className="space-y-2">
+                          <Typography variant="caption" className="text-emerald-400 flex items-center gap-1">
+                            <Save className="h-3 w-3" /> Đã lưu vào thư viện
+                          </Typography>
+                          <Link
+                            href={`/playlist/${savedPlaylistId}`}
+                            className="block text-xs text-accent hover:underline"
+                          >
+                            Xem playlist →
+                          </Link>
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={handleSavePlaylist}
+                          disabled={isSaving}
+                          className="w-full gap-2"
+                          size="sm"
+                        >
+                          {isSaving ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4" />
+                          )}
+                          {isSaving ? "Đang lưu..." : "Lưu Playlist vào thư viện"}
+                        </Button>
+                      )
+                    ) : (
+                      <Typography variant="caption" color="muted" className="text-center block">
+                        <Link href="/login" className="text-accent hover:underline">Đăng nhập</Link> để lưu playlist
+                      </Typography>
+                    )}
+                  </div>
+                </div>
+              </GlassWindow>
+            </div>
+          )}
           {playlist && playlist.playlist.length > 0 && (
             <div className="hidden w-80 shrink-0 xl:block">
-              <GlassWindow className="sticky top-6 max-h-[calc(100vh-12rem)] overflow-y-auto rounded-2xl p-5" intensity="medium">
+              <GlassWindow className="sticky top-6 max-h-[calc(100dvh-20rem)] overflow-y-auto rounded-2xl p-5" intensity="medium">
                 <div className="mb-4 flex items-center gap-2">
                   <Music className="h-5 w-5 text-accent" />
                   <Typography variant="h4" className="text-base">
@@ -370,13 +600,28 @@ export default function ChatbotPage() {
                       className="rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <Typography className="truncate text-sm font-medium">
-                            {track.name}
-                          </Typography>
-                          <Typography variant="caption" color="muted" className="truncate">
-                            {track.artist}
-                          </Typography>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <button
+                            type="button"
+                            disabled={playingTrackId === track.id}
+                            onClick={() => handlePlayGeneratedTrack(track.id)}
+                            className="block min-w-0 text-left text-sm font-medium leading-5 text-foreground transition-colors hover:text-accent hover:underline disabled:cursor-wait disabled:text-muted"
+                          >
+                            <span className="line-clamp-2 break-words">{track.name}</span>
+                          </button>
+                          <div className="flex min-w-0 flex-wrap gap-x-1 gap-y-0.5 text-xs leading-5 text-muted">
+                            {splitArtistNames(track.artist).map((artist, artistIndex, artists) => (
+                              <span key={`${track.id}-${artist}`} className="min-w-0">
+                                <Link
+                                  href={`/artist/${encodeURIComponent(artist)}`}
+                                  className="break-words transition-colors hover:text-accent hover:underline"
+                                >
+                                  {artist}
+                                </Link>
+                                {artistIndex < artists.length - 1 && ","}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                         {track.similarity && (
                           <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
