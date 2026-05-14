@@ -453,7 +453,7 @@ export default function ChatbotPage() {
   }
 
   return (
-    <div className="h-[calc(100dvh-14rem)] overflow-hidden p-4 md:h-[calc(100dvh-8rem)] md:min-h-0 md:overflow-hidden md:p-5 lg:p-6 xl:p-8">
+    <div className="h-[calc(100dvh-14rem)] overflow-hidden p-4 md:h-[calc(100dvh-11rem)] md:min-h-0 md:overflow-hidden md:p-5 lg:p-6 xl:p-8">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-4 md:gap-4 lg:gap-5">
         <header className="shrink-0 space-y-3">
           <div className="flex items-start justify-between gap-3">
@@ -584,8 +584,8 @@ export default function ChatbotPage() {
 
           {/* ─── Playlist sidebar ────────────────────────────────── */}
           {playlist && playlist.playlist.length > 0 && isMobilePlaylistOpen && (
-            <div className="fixed inset-x-4 bottom-28 z-40 max-h-[46dvh] overflow-hidden xl:hidden">
-              <GlassWindow className="flex max-h-[46dvh] flex-col rounded-2xl border border-white/10 bg-black/80 backdrop-blur-xl" intensity="medium">
+            <div className="fixed inset-x-4 bottom-28 z-40 h-[46dvh] overflow-hidden xl:hidden">
+              <GlassWindow className="flex h-full min-h-0 flex-col rounded-2xl border border-white/10 bg-black/80 backdrop-blur-xl" intensity="medium">
                 <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Music className="h-5 w-5 text-accent" />
@@ -604,13 +604,15 @@ export default function ChatbotPage() {
                   </Button>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                <div className="shrink-0 px-4 py-3">
                   {playlist.seedFound && (
-                    <Typography variant="caption" color="muted" className="mb-3 block">
+                    <Typography variant="caption" color="muted" className="block">
                       Playlist: <span className="text-accent">{playlist.playlistName || playlist.seedFound}</span>
                     </Typography>
                   )}
+                </div>
 
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">
                   <div className="space-y-2">
                     {playlist.playlist.map((track, i) => (
                       <PlaylistTrackCard
@@ -622,8 +624,9 @@ export default function ChatbotPage() {
                       />
                     ))}
                   </div>
+                </div>
 
-                  <div className="mt-4 border-t border-white/10 pt-3 space-y-2">
+                  <div className="shrink-0 space-y-2 border-t border-white/10 px-4 py-3">
                     {session?.user ? (
                       savedPlaylistId ? (
                         <div className="space-y-2">
@@ -658,14 +661,13 @@ export default function ChatbotPage() {
                       </Typography>
                     )}
                   </div>
-                </div>
               </GlassWindow>
             </div>
           )}
           {playlist && playlist.playlist.length > 0 && (
-            <div className="hidden w-[26rem] shrink-0 xl:block">
-              <GlassWindow className="sticky top-6 flex max-h-[calc(100dvh-9rem)] min-h-0 flex-col overflow-hidden rounded-2xl p-5" intensity="medium">
-                <div className="mb-4 flex items-center gap-2">
+            <div className="hidden w-[26rem] shrink-0 xl:flex xl:min-h-0">
+              <GlassWindow className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl p-5" intensity="medium">
+                <div className="mb-4 flex shrink-0 items-center gap-2">
                   <Music className="h-5 w-5 text-accent" />
                   <Typography variant="h4" className="text-base">
                     Playlist gợi ý
@@ -673,7 +675,7 @@ export default function ChatbotPage() {
                 </div>
 
                 {playlist.seedFound && (
-                  <Typography variant="caption" color="muted" className="mb-3 block">
+                  <Typography variant="caption" color="muted" className="mb-3 block shrink-0">
                     Playlist: <span className="text-accent">{playlist.playlistName || playlist.seedFound}</span>
                   </Typography>
                 )}
