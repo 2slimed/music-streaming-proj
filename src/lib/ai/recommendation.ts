@@ -44,13 +44,28 @@ function cosineSimilarity(a: FeatureVector, b: FeatureVector): number {
 }
 
 export async function findSeedSong(query: string): Promise<SeedTrack | null> {
-  const track = await prisma.track.findFirst({
-    where: {
-      OR: [
-        { trackName: { contains: query, mode: "insensitive" } },
-        { artists: { contains: query, mode: "insensitive" } },
-      ],
-    },
+  let whereClause: any = {
+    OR: [
+      { trackName: { contains: query, mode: "insensitive" } },
+      { artists: { contains: query, mode: "insensitive" } },
+    ],
+  };
+
+  // Tách tên bài hát và nghệ sĩ nếu người dùng dùng " của ", " by ", " - "
+  const splitMatch = query.match(/^(.*?)\s+(?:của|by|-)\s+(.*)$/i);
+  if (splitMatch) {
+    const trackPart = splitMatch[1].trim();
+    const artistPart = splitMatch[2].trim();
+    whereClause = {
+      AND: [
+        { trackName: { contains: trackPart, mode: "insensitive" } },
+        { artists: { contains: artistPart, mode: "insensitive" } },
+      ]
+    };
+  }
+
+  let track = await prisma.track.findFirst({
+    where: whereClause,
     orderBy: { popularity: "desc" },
     select: {
       trackName: true,
@@ -63,6 +78,28 @@ export async function findSeedSong(query: string): Promise<SeedTrack | null> {
     },
   });
 
+  // Fallback: Nếu không tìm thấy bằng AND (do người dùng gõ sai cấu trúc), thử lại bằng OR nguyên bản
+  if (!track && splitMatch) {
+    track = await prisma.track.findFirst({
+      where: {
+        OR: [
+          { trackName: { contains: query, mode: "insensitive" } },
+          { artists: { contains: query, mode: "insensitive" } },
+        ],
+      },
+      orderBy: { popularity: "desc" },
+      select: {
+        trackName: true,
+        artists: true,
+        energyNorm: true,
+        danceabilityNorm: true,
+        popularityNorm: true,
+        durationMsNorm: true,
+        explicitNorm: true,
+      },
+    });
+  }
+
   if (!track) return null;
 
   return {
@@ -72,7 +109,7 @@ export async function findSeedSong(query: string): Promise<SeedTrack | null> {
   };
 }
 
-export async function getRecommendations(seed: SeedTrack, count: number = 50): Promise<RecommendationResult[]> {
+export async function getRecommendations(seed: SeedTrack, count: number = 100): Promise<RecommendationResult[]> {
   const allTracks = await prisma.track.findMany({
     where: {
       NOT: {

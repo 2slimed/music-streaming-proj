@@ -1,32 +1,92 @@
-import { google } from '@ai-sdk/google';
-import { generateText } from 'ai';
-import { prisma } from '@/lib/prisma';
-import { findSeedSong, getRecommendations } from '@/lib/ai/recommendation';
+import fs from "node:fs";
+import path from "node:path";
+import { google } from "@ai-sdk/google";
+import { generateObject, generateText } from "ai";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
 
 export const maxDuration = 60;
+export const runtime = "nodejs";
 
-// ─── Models: chỉ Gemini (Gemma cần Vertex AI, không dùng được) ─────
 const MODEL_PRIORITY = [
-  'gemini-2.5-flash',       // 2000 RPM
-  'gemini-2.0-flash',       // 2000 RPM
-  'gemini-1.5-flash',       // 2000 RPM
-  'gemini-2.0-flash-lite',  // 30 RPM
-];
+  // Gemma has much higher RPD on this key, but it is less reliable for structured outputs.
+  { id: "gemma-4-31b-it", label: "Gemma 4 31B", mode: "text-json" },
+  // Flash Lite has higher RPD than Flash and supports structured outputs reliably.
+  { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite", mode: "structured" },
+  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", mode: "structured" },
+  // Last-resort text models with low RPD on the current quota table.
+  { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", mode: "structured" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", mode: "structured" },
+] as const;
 
-// ─── Category centroids cho tìm kiếm theo tâm trạng ─────────────────
-type FeatureVector = [number, number, number, number, number];
+const PRIMARY_MODEL = MODEL_PRIORITY[0].id;
+const MIN_RECOMMENDATIONS = 20;
+const MAX_CANDIDATES_FOR_GEMINI = 260;
 
-const CATEGORY_CENTROIDS: Record<string, { centroid: FeatureVector; label: string }> = {
-  buồn:    { centroid: [0.175, 0.2,   0.25, 0.5, 0.0], label: 'buồn / sâu lắng' },
-  sad:     { centroid: [0.175, 0.2,   0.25, 0.5, 0.0], label: 'buồn / sâu lắng' },
-  chill:   { centroid: [0.3,   0.375, 0.4,  0.5, 0.0], label: 'thư giãn / chill' },
-  study:   { centroid: [0.25,  0.3,   0.3,  0.5, 0.0], label: 'tập trung / học tập' },
-  romantic:{ centroid: [0.375, 0.475, 0.5,  0.5, 0.0], label: 'lãng mạn' },
-  happy:   { centroid: [0.65,  0.675, 0.6,  0.5, 0.0], label: 'vui vẻ / hạnh phúc' },
-  vui:     { centroid: [0.65,  0.675, 0.6,  0.5, 0.0], label: 'vui vẻ / hạnh phúc' },
-  party:   { centroid: [0.8,   0.8,   0.7,  0.5, 0.5], label: 'tiệc tùng / sôi động' },
-  workout: { centroid: [0.825, 0.75,  0.6,  0.5, 0.3], label: 'tập luyện / năng lượng' },
-};
+type ChatRole = "user" | "assistant" | "system";
+
+interface ChatMessage {
+  role: ChatRole;
+  content: string;
+}
+
+interface CsvExtra {
+  trackId: string;
+  artists: string;
+  albumName: string;
+  trackName: string;
+  popularity: number;
+  durationMs: number;
+  explicit: boolean;
+  danceability: number;
+  energy: number;
+  speechiness: number;
+  acousticness: number;
+  instrumentalness: number;
+  liveness: number;
+  valence: number;
+  tempo: number;
+  trackGenre: string;
+}
+
+interface CsvIndex {
+  byTrackId: Map<string, CsvExtra>;
+  byGenre: Map<string, CsvExtra[]>;
+  allRows: CsvExtra[];
+}
+
+interface DbTrack {
+  id: string;
+  trackId: string;
+  trackName: string;
+  artists: string;
+  albumName: string;
+  popularity: number;
+  durationMs: number;
+  explicit: boolean;
+  danceability: number;
+  energy: number;
+}
+
+interface CandidateTrack {
+  id: string;
+  sourceTrackId: string;
+  title: string;
+  artist: string;
+  album: string;
+  popularity: number;
+  durationMs: number;
+  explicit: boolean;
+  danceability: number;
+  energy: number;
+  trackGenre?: string;
+  tempo?: number;
+  valence?: number;
+  acousticness?: number;
+  instrumentalness?: number;
+  speechiness?: number;
+  liveness?: number;
+}
 
 interface PlaylistTrack {
   id: string;
@@ -38,271 +98,704 @@ interface PlaylistTrack {
 
 interface PlaylistResult {
   seedFound: string;
+  playlistName: string;
   playlist: PlaylistTrack[];
   notFound: string | null;
-  categoryLabel?: string;
+  matchedCount: number;
+  requestedCount: number;
 }
 
-// ─── Phát hiện category từ message ──────────────────────────────────
-function detectCategory(text: string): { centroid: FeatureVector; label: string } | null {
-  const lower = text.toLowerCase();
-  for (const [key, info] of Object.entries(CATEGORY_CENTROIDS)) {
-    if (lower.includes(key)) return info;
-  }
-  if (/(năng lượng|sôi động|bùng nổ)/.test(lower)) return CATEGORY_CENTROIDS.workout;
-  if (/(thư giãn|nhẹ nhàng|êm dịu)/.test(lower)) return CATEGORY_CENTROIDS.chill;
-  return null;
+const intentSchema = z.object({
+  intent: z.enum(["similar_song", "mood_search", "general_chat"]),
+  songTitle: z.string().nullable().optional(),
+  artistName: z.string().nullable().optional(),
+  mood: z.string().nullable().optional(),
+  languageHint: z.string().nullable().optional(),
+  genreHint: z.string().nullable().optional(),
+  count: z.number().int().min(MIN_RECOMMENDATIONS).max(50).default(MIN_RECOMMENDATIONS),
+});
+
+type ParsedIntent = z.infer<typeof intentSchema>;
+
+const recommendationSchema = z.object({
+  reply: z.string().min(1),
+  playlistName: z.string().min(1),
+  recommendations: z.array(z.object({
+    id: z.string().optional(),
+    sourceTrackId: z.string().optional(),
+    title: z.string().min(1),
+    artist: z.string().min(1),
+    reason: z.string().optional(),
+  })),
+});
+
+type GeminiRecommendation = z.infer<typeof recommendationSchema>;
+
+let csvIndexPromise: Promise<CsvIndex> | null = null;
+
+function hasGeminiKey() {
+  return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim());
 }
 
-// ─── Trích xuất tên bài hát ─────────────────────────────────────────
-function extractSongName(text: string): string | null {
-  const patterns = [
-    /(?:giống|giong|tương tự|tuong tu|like|similar\s+to)\s+(?:bài|bai|song|bài hát|bai hat)?\s*["']([^"']+)["']/i,
-    /(?:giống|giong|tương tự|tuong tu|like|similar\s+to)\s+(?:bài|bai|song|bài hát|bai hat)?\s+([A-Za-zÀ-ỹ0-9][A-Za-zÀ-ỹ0-9 \-']{1,50}?)(?:\s*(?:không|khong|nhé|nhe|\?|$))/i,
-    /(?:bài|bai|ca khúc|ca khuc|song|track)\s+["']([^"']+)["']/i,
-    /["']([^"']{2,50})["']/,
-    // Tên bài đơn giản: "tìm X" hoặc "kiếm X"
-    /(?:tìm|tim|kiếm|kiem|nghe)\s+(.+?)(?:\s+(?:bài|bai|nhạc|nhac|cho|với))?\s*$/i,
-  ];
+function extractJsonObject(text: string) {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+  if (fenced) return fenced;
 
-  for (const pattern of patterns) {
-    const m = text.match(pattern);
-    const candidate = m?.[1]?.trim();
-    if (candidate && candidate.length > 1 && candidate.length < 60) return candidate;
-  }
-  return null;
-}
-
-// ─── Cosine similarity cho category search ──────────────────────────
-function dotProduct(a: FeatureVector, b: FeatureVector): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] + a[4] * b[4];
-}
-function magnitude(v: FeatureVector): number {
-  return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3] + v[4] * v[4]);
-}
-function cosineSimilarity(a: FeatureVector, b: FeatureVector): number {
-  const ma = magnitude(a); const mb = magnitude(b);
-  if (ma === 0 || mb === 0) return 0;
-  return dotProduct(a, b) / (ma * mb);
-}
-
-// ─── Tìm nhạc theo category KNN ─────────────────────────────────────
-async function searchByCategory(centroid: FeatureVector, label: string, count: number = 50): Promise<PlaylistResult> {
-  const allTracks = await prisma.track.findMany({
-    select: {
-      id: true, trackName: true, artists: true, albumName: true,
-      energyNorm: true, danceabilityNorm: true, popularityNorm: true, durationMsNorm: true, explicitNorm: true,
-    },
-  });
-
-  const results = allTracks
-    .map((t) => ({
-      id: t.id, name: t.trackName, artist: t.artists, album: t.albumName,
-      vector: [t.energyNorm, t.danceabilityNorm, t.popularityNorm, t.durationMsNorm, t.explicitNorm] as FeatureVector,
-    }))
-    .map((t) => ({ ...t, similarity: cosineSimilarity(centroid, t.vector) }))
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, count)
-    .map((t) => ({
-      id: t.id, name: t.name, artist: t.artist, album: t.album,
-      similarity: `${(t.similarity * 100).toFixed(1)}%`,
-    }));
-
-  return { seedFound: '', playlist: results, notFound: null, categoryLabel: label };
-}
-
-// ─── Tìm playlist tổng hợp ──────────────────────────────────────────
-async function searchPlaylist(message: string): Promise<PlaylistResult | null> {
-  // 1. Thử tìm theo category
-  const category = detectCategory(message);
-  if (category) {
-    console.log('[Chat] Tìm theo category:', category.label);
-    return searchByCategory(category.centroid, category.label);
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return text.slice(firstBrace, lastBrace + 1);
   }
 
-  // 2. Thử tìm bài hát tương tự
-  const songName = extractSongName(message);
-  console.log('[Chat] Tên bài hát trích xuất:', songName);
-
-  if (!songName) return null;
-
-  const seed = await findSeedSong(songName);
-  if (!seed) {
-    return { seedFound: '', playlist: [], notFound: songName };
-  }
-
-  const pl = await getRecommendations(seed, 50);
-  console.log('[Chat] Đã tạo playlist:', pl.length, 'bài');
-  return { seedFound: `${seed.track_name} — ${seed.artists}`, playlist: pl, notFound: null };
+  return text.trim();
 }
 
-// ─── Format danh sách nhạc thành text ───────────────────────────────
-function formatTrackList(tracks: PlaylistTrack[], maxShow: number = 10): string {
-  if (!tracks.length) return '';
-  return tracks.slice(0, maxShow)
-    .map((t, i) => `${i + 1}. **${t.name}** — ${t.artist}${t.similarity ? ` (${t.similarity})` : ''}`)
-    .join('\n');
-}
+async function generateObjectWithModelFallback<Schema extends z.ZodType>(options: {
+  schema: Schema;
+  system: string;
+  prompt: string;
+}): Promise<{ object: z.infer<Schema>; modelId: string }> {
+  let lastError: unknown = null;
 
-// ─── Sinh text rule-based khi Gemini lỗi ────────────────────────────
-function generateFallbackText(userMsg: string, playlistData: PlaylistResult | null): string {
-  if (!playlistData || playlistData.playlist.length === 0) {
-    if (playlistData?.notFound) {
-      return `Không tìm thấy bài **"${playlistData.notFound}"** trong thư viện (114,000+ bài). Bạn thử kiểm tra lại tên hoặc hỏi theo tâm trạng: "nhạc chill", "bài hát vui", "workout"...`;
-    }
-    return `Mình chưa tìm thấy kết quả phù hợp. Hãy thử:\n- **Tên bài hát**: "tìm bài Yesterday"\n- **Tâm trạng**: "nhạc chill", "workout", "nhạc buồn"\n- **Nghệ sĩ**: "bài của Sơn Tùng"`;
-  }
-
-  if (playlistData.categoryLabel) {
-    const list = formatTrackList(playlistData.playlist, 10);
-    return `Đây là những bài hát phù hợp với **${playlistData.categoryLabel}**:\n\n${list}\n\n_Tìm thấy ${playlistData.playlist.length} bài — bạn muốn lưu playlist này không?_`;
-  }
-
-  if (playlistData.seedFound) {
-    const list = formatTrackList(playlistData.playlist, 10);
-    return `Đây là **${playlistData.playlist.length}** bài hát tương tự **${playlistData.seedFound}**:\n\n${list}\n\n_Bạn muốn mình điều chỉnh thêm gì không?_`;
-  }
-
-  const list = formatTrackList(playlistData.playlist, 10);
-  return `Mình tìm thấy những bài này cho bạn:\n\n${list}`;
-}
-
-// ─── Gọi Gemini ─────────────────────────────────────────────────────
-async function callGemini(
-  userMsg: string,
-  systemContext: string,
-): Promise<{ text: string; model: string }> {
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    console.warn('[Chat] GOOGLE_GENERATIVE_AI_API_KEY chưa được cấu hình');
-    return { text: '', model: '' };
-  }
-
-  for (const modelId of MODEL_PRIORITY) {
+  for (const model of MODEL_PRIORITY) {
     try {
-      console.log('[Chat] Thử model:', modelId);
-      const result = await generateText({
-        model: google(modelId),
-        prompt: userMsg,
-        system: systemContext,
-        maxOutputTokens: 1024,
-      });
-      console.log('[Chat] Thành công với model:', modelId);
-      return { text: result.text ?? '', model: modelId };
-    } catch (err: unknown) {
-      console.warn(`[Chat] Model ${modelId} LỖI:`, (err as Error)?.message ?? String(err));
-      continue;
-    }
-  }
-  console.warn('[Chat] Tất cả models đều thất bại → dùng fallback rule-based');
-  return { text: '', model: '' };
-}
+      if (model.mode === "text-json") {
+        const result = await generateText({
+          model: google(model.id),
+          system: `${options.system}
 
-// ─── Build system prompt ─────────────────────────────────────────────
-function buildSystemContext(playlistData: PlaylistResult | null): string {
-  let ctx = 'Bạn là trợ lý AI chuyên gợi ý âm nhạc, tên MelodyMix AI. Trả lời ngắn gọn, thân thiện, tự nhiên bằng tiếng Việt.';
-
-  if (playlistData && playlistData.playlist.length > 0) {
-    const top10 = playlistData.playlist.slice(0, 10).map((t, i) =>
-      `${i + 1}. ${t.name} - ${t.artist} (độ tương đồng: ${t.similarity})`
-    ).join('\n');
-
-    if (playlistData.categoryLabel) {
-      ctx += `\n\n[KẾT QUẢ TÌM KIẾM]\nThể loại: ${playlistData.categoryLabel}\nTìm thấy ${playlistData.playlist.length} bài. Hãy giới thiệu và liệt kê top 10:\n${top10}`;
-    } else {
-      ctx += `\n\n[KẾT QUẢ TÌM KIẾM]\nBài gốc: ${playlistData.seedFound}\nTìm thấy ${playlistData.playlist.length} bài tương tự. Hãy giới thiệu và liệt kê top 10:\n${top10}`;
-    }
-  } else if (playlistData?.notFound) {
-    ctx += `\n\n[KHÔNG TÌM THẤY] "${playlistData.notFound}" không có trong database. Gợi ý người dùng thử lại hoặc tìm theo tâm trạng (chill, vui, buồn...).`;
-  } else {
-    ctx += '\n\nNgười dùng có thể hỏi về: tên bài hát cụ thể, thể loại/tâm trạng (chill, vui, buồn, workout, party...), hoặc tìm nghệ sĩ. Nếu không hiểu, hãy gợi ý các cách tìm nhạc.';
-  }
-
-  return ctx;
-}
-
-// ─── Streaming response ─────────────────────────────────────────────
-async function handleStream(req: Request): Promise<Response> {
-  const { message } = await req.json();
-  const userMsg: string = message?.trim() ?? '';
-
-  const encoder = new TextEncoder();
-  const send = (ctrl: ReadableStreamDefaultController, data: object) => {
-    ctrl.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-  };
-
-  const playlistData = await searchPlaylist(userMsg);
-  const systemContext = buildSystemContext(playlistData);
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        send(controller, { type: 'start' });
-
-        // Luôn gửi playlist data nếu có
-        if (playlistData && playlistData.playlist.length > 0) {
-          send(controller, {
-            type: 'tool-result',
-            result: {
-              seedFound: playlistData.seedFound || playlistData.categoryLabel || '',
-              playlist: playlistData.playlist.slice(0, 20),
-            },
-          });
-        }
-
-        // Gọi Gemini để sinh text, nếu lỗi thì dùng fallback
-        const { text } = await callGemini(userMsg, systemContext);
-        const finalText = text || generateFallbackText(userMsg, playlistData);
-
-        send(controller, { type: 'text-start', id: '0' });
-        send(controller, { type: 'text-delta', id: '0', delta: finalText });
-        send(controller, { type: 'text-end', id: '0' });
-        send(controller, { type: 'finish', finishReason: 'stop' });
-      } finally {
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
+Return exactly one valid JSON object. Do not include markdown, code fences, comments, or extra text.`,
+          prompt: options.prompt,
+        });
+        const parsed = JSON.parse(extractJsonObject(result.text));
+        return { object: options.schema.parse(parsed), modelId: model.id };
       }
-    },
-  });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
-  });
+      const result = await generateObject({
+        model: google(model.id),
+        schema: options.schema,
+        system: options.system,
+        prompt: options.prompt,
+      });
+      return { object: result.object as z.infer<Schema>, modelId: model.id };
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[Chat] Model ${model.label} (${model.id}) failed, trying next model:`, message);
+    }
+  }
+
+  throw lastError ?? new Error("All configured Gemini/Gemma models failed");
 }
 
-// ─── Main Route Handler ─────────────────────────────────────────────
+function splitCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      fields.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+
+  fields.push(current.trim());
+  return fields;
+}
+
+function toNumber(value: string | undefined, fallback = 0) {
+  const parsed = Number.parseFloat(value ?? "");
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toBoolean(value: string | undefined) {
+  return value?.toLowerCase() === "true";
+}
+
+async function loadCsvIndex(): Promise<CsvIndex> {
+  if (csvIndexPromise) return csvIndexPromise;
+
+  csvIndexPromise = fs.promises
+    .readFile(path.join(process.cwd(), "data", "dataset.csv"), "utf-8")
+    .then((content) => {
+      const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
+      const header = splitCsvLine(lines[0] ?? "");
+      const column = new Map(header.map((name, index) => [name, index]));
+      const byTrackId = new Map<string, CsvExtra>();
+      const byGenre = new Map<string, CsvExtra[]>();
+      const allRows: CsvExtra[] = [];
+
+      for (const line of lines.slice(1)) {
+        const fields = splitCsvLine(line);
+        const get = (name: string) => fields[column.get(name) ?? -1] ?? "";
+        const trackId = get("track_id");
+        if (!trackId) continue;
+
+        const row: CsvExtra = {
+          trackId,
+          artists: get("artists"),
+          albumName: get("album_name"),
+          trackName: get("track_name"),
+          popularity: Math.round(toNumber(get("popularity"))),
+          durationMs: Math.round(toNumber(get("duration_ms"))),
+          explicit: toBoolean(get("explicit")),
+          danceability: toNumber(get("danceability")),
+          energy: toNumber(get("energy")),
+          speechiness: toNumber(get("speechiness")),
+          acousticness: toNumber(get("acousticness")),
+          instrumentalness: toNumber(get("instrumentalness")),
+          liveness: toNumber(get("liveness")),
+          valence: toNumber(get("valence")),
+          tempo: toNumber(get("tempo")),
+          trackGenre: get("track_genre"),
+        };
+
+        allRows.push(row);
+        byTrackId.set(trackId, row);
+
+        if (row.trackGenre) {
+          const genreRows = byGenre.get(row.trackGenre) ?? [];
+          genreRows.push(row);
+          byGenre.set(row.trackGenre, genreRows);
+        }
+      }
+
+      for (const rows of byGenre.values()) {
+        rows.sort((a, b) => b.popularity - a.popularity);
+      }
+
+      return { byTrackId, byGenre, allRows };
+    })
+    .catch((error) => {
+      console.warn("[Chat] Could not load data/dataset.csv for enrichment:", error);
+      return { byTrackId: new Map(), byGenre: new Map(), allRows: [] };
+    });
+
+  return csvIndexPromise;
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compactNullable(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function enrichTrack(track: DbTrack, csvIndex: CsvIndex): CandidateTrack {
+  const extra = csvIndex.byTrackId.get(track.trackId);
+
+  return {
+    id: track.id,
+    sourceTrackId: track.trackId,
+    title: track.trackName,
+    artist: track.artists,
+    album: track.albumName,
+    popularity: track.popularity,
+    durationMs: track.durationMs,
+    explicit: track.explicit,
+    danceability: extra?.danceability ?? track.danceability,
+    energy: extra?.energy ?? track.energy,
+    trackGenre: extra?.trackGenre,
+    tempo: extra?.tempo,
+    valence: extra?.valence,
+    acousticness: extra?.acousticness,
+    instrumentalness: extra?.instrumentalness,
+    speechiness: extra?.speechiness,
+    liveness: extra?.liveness,
+  };
+}
+
+function dedupeCandidates(candidates: CandidateTrack[], limit = MAX_CANDIDATES_FOR_GEMINI) {
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  const deduped: CandidateTrack[] = [];
+
+  for (const candidate of candidates) {
+    const nameKey = `${normalizeText(candidate.title)}::${normalizeText(candidate.artist)}`;
+    if (seenIds.has(candidate.id) || seenNames.has(nameKey)) continue;
+    seenIds.add(candidate.id);
+    seenNames.add(nameKey);
+    deduped.push(candidate);
+    if (deduped.length >= limit) break;
+  }
+
+  return deduped;
+}
+
+async function parseIntentWithGemini(
+  messages: ChatMessage[],
+  userMessage: string,
+): Promise<{ intent: ParsedIntent; modelId: string }> {
+  const result = await generateObjectWithModelFallback({
+    schema: intentSchema,
+    system: `You parse music-chat requests for MelodyMix.
+Return strict JSON only.
+Intent rules:
+- similar_song: the user asks for songs similar to a specific track.
+- mood_search: the user asks for music by mood, activity, vibe, or energy.
+- general_chat: not a recommendation request.
+Extract songTitle and artistName when present. Preserve Vietnamese text.`,
+    prompt: JSON.stringify({
+      latestUserMessage: userMessage,
+      recentMessages: messages.slice(-6),
+      minimumCount: MIN_RECOMMENDATIONS,
+    }),
+  });
+
+  return {
+    modelId: result.modelId,
+    intent: {
+      ...result.object,
+      songTitle: compactNullable(result.object.songTitle),
+      artistName: compactNullable(result.object.artistName),
+      mood: compactNullable(result.object.mood),
+      languageHint: compactNullable(result.object.languageHint),
+      genreHint: compactNullable(result.object.genreHint),
+      count: Math.max(result.object.count ?? MIN_RECOMMENDATIONS, MIN_RECOMMENDATIONS),
+    },
+  };
+}
+
+async function findSeedTrack(intent: ParsedIntent, csvIndex: CsvIndex): Promise<CandidateTrack | null> {
+  const songTitle = compactNullable(intent.songTitle);
+  const artistName = compactNullable(intent.artistName);
+  if (!songTitle) return null;
+
+  const where = artistName
+    ? {
+        AND: [
+          { trackName: { contains: songTitle, mode: "insensitive" as const } },
+          { artists: { contains: artistName, mode: "insensitive" as const } },
+        ],
+      }
+    : { trackName: { contains: songTitle, mode: "insensitive" as const } };
+
+  let track = await prisma.track.findFirst({
+    where,
+    orderBy: { popularity: "desc" },
+    select: trackSelect,
+  });
+
+  if (!track && artistName) {
+    track = await prisma.track.findFirst({
+      where: {
+        OR: [
+          { trackName: { contains: songTitle, mode: "insensitive" } },
+          { artists: { contains: artistName, mode: "insensitive" } },
+        ],
+      },
+      orderBy: { popularity: "desc" },
+      select: trackSelect,
+    });
+  }
+
+  return track ? enrichTrack(track, csvIndex) : null;
+}
+
+const trackSelect = {
+  id: true,
+  trackId: true,
+  trackName: true,
+  artists: true,
+  albumName: true,
+  popularity: true,
+  durationMs: true,
+  explicit: true,
+  danceability: true,
+  energy: true,
+} as const;
+
+function featureDistanceScore(seed: CandidateTrack, row: CsvExtra) {
+  const dance = Math.abs(seed.danceability - row.danceability);
+  const energy = Math.abs(seed.energy - row.energy);
+  const valence = Math.abs((seed.valence ?? 0.5) - row.valence);
+  const tempo = Math.min(Math.abs((seed.tempo ?? 120) - row.tempo) / 180, 1);
+  return row.popularity / 100 - dance * 0.35 - energy * 0.35 - valence * 0.2 - tempo * 0.1;
+}
+
+function moodScore(row: CsvExtra, mood?: string | null) {
+  const normalizedMood = normalizeText(mood ?? "");
+  if (/(soi dong|nang luong|quay|party|workout|gym|tap luyen)/.test(normalizedMood)) {
+    return row.energy * 0.4 + row.danceability * 0.3 + Math.min(row.tempo / 180, 1) * 0.15 + row.popularity / 100 * 0.15;
+  }
+  if (/(buon|sad|suy|tam trang|mua)/.test(normalizedMood)) {
+    return (1 - row.energy) * 0.3 + (1 - row.valence) * 0.35 + row.acousticness * 0.2 + row.popularity / 100 * 0.15;
+  }
+  if (/(chill|thu gian|nhe nhang|hoc|tap trung|study|focus)/.test(normalizedMood)) {
+    return (1 - Math.abs(row.energy - 0.35)) * 0.25 + row.acousticness * 0.25 + (1 - row.speechiness) * 0.2 + row.popularity / 100 * 0.3;
+  }
+  if (/(vui|happy|hanh phuc|yeu doi)/.test(normalizedMood)) {
+    return row.valence * 0.35 + row.energy * 0.25 + row.danceability * 0.2 + row.popularity / 100 * 0.2;
+  }
+  return row.popularity / 100 * 0.45 + row.energy * 0.25 + row.danceability * 0.2 + row.valence * 0.1;
+}
+
+async function findTracksBySourceIds(sourceTrackIds: string[], csvIndex: CsvIndex): Promise<CandidateTrack[]> {
+  if (sourceTrackIds.length === 0) return [];
+
+  const tracks = await prisma.track.findMany({
+    where: { trackId: { in: sourceTrackIds } },
+    select: trackSelect,
+  });
+  const order = new Map(sourceTrackIds.map((trackId, index) => [trackId, index]));
+
+  return tracks
+    .sort((a, b) => (order.get(a.trackId) ?? 0) - (order.get(b.trackId) ?? 0))
+    .map((track) => enrichTrack(track, csvIndex));
+}
+
+async function buildSimilarCandidates(seed: CandidateTrack, csvIndex: CsvIndex): Promise<CandidateTrack[]> {
+  const candidates: CandidateTrack[] = [];
+  const seedGenre = seed.trackGenre;
+
+  if (seedGenre) {
+    const genreRows = (csvIndex.byGenre.get(seedGenre) ?? [])
+      .filter((row) => row.trackId !== seed.sourceTrackId)
+      .sort((a, b) => featureDistanceScore(seed, b) - featureDistanceScore(seed, a))
+      .slice(0, 360);
+    candidates.push(...await findTracksBySourceIds(genreRows.map((row) => row.trackId), csvIndex));
+  }
+
+  const primaryArtist = seed.artist.split(";")[0]?.trim();
+  if (primaryArtist) {
+    const sameArtist = await prisma.track.findMany({
+      where: {
+        id: { not: seed.id },
+        artists: { contains: primaryArtist, mode: "insensitive" },
+      },
+      orderBy: { popularity: "desc" },
+      take: 60,
+      select: trackSelect,
+    });
+    candidates.push(...sameArtist.map((track) => enrichTrack(track, csvIndex)));
+  }
+
+  const nearbyAudio = await prisma.track.findMany({
+    where: {
+      id: { not: seed.id },
+      energy: { gte: Math.max(seed.energy - 0.25, 0), lte: Math.min(seed.energy + 0.25, 1) },
+      danceability: { gte: Math.max(seed.danceability - 0.25, 0), lte: Math.min(seed.danceability + 0.25, 1) },
+    },
+    orderBy: { popularity: "desc" },
+    take: 160,
+    select: trackSelect,
+  });
+  candidates.push(...nearbyAudio.map((track) => enrichTrack(track, csvIndex)));
+
+  const popularTracks = await prisma.track.findMany({
+    where: { id: { not: seed.id } },
+    orderBy: { popularity: "desc" },
+    take: 80,
+    select: trackSelect,
+  });
+  candidates.push(...popularTracks.map((track) => enrichTrack(track, csvIndex)));
+
+  return dedupeCandidates(candidates);
+}
+
+async function buildMoodCandidates(intent: ParsedIntent, csvIndex: CsvIndex): Promise<CandidateTrack[]> {
+  const moodRows = [...csvIndex.allRows]
+    .sort((a, b) => moodScore(b, intent.mood ?? intent.genreHint) - moodScore(a, intent.mood ?? intent.genreHint))
+    .slice(0, 420);
+
+  const candidates = await findTracksBySourceIds(moodRows.map((row) => row.trackId), csvIndex);
+
+  if (candidates.length >= MAX_CANDIDATES_FOR_GEMINI) {
+    return dedupeCandidates(candidates);
+  }
+
+  const dbCandidates = await prisma.track.findMany({
+    where: {
+      energy: { gte: 0.35 },
+      danceability: { gte: 0.35 },
+    },
+    orderBy: { popularity: "desc" },
+    take: 180,
+    select: trackSelect,
+  });
+
+  return dedupeCandidates([
+    ...candidates,
+    ...dbCandidates.map((track) => enrichTrack(track, csvIndex)),
+  ]);
+}
+
+function serializeCandidatesForGemini(candidates: CandidateTrack[]) {
+  return candidates.map((candidate) => ({
+    id: candidate.id,
+    sourceTrackId: candidate.sourceTrackId,
+    title: candidate.title,
+    artist: candidate.artist,
+    album: candidate.album,
+    popularity: candidate.popularity,
+    durationMs: candidate.durationMs,
+    explicit: candidate.explicit,
+    danceability: Number(candidate.danceability.toFixed(3)),
+    energy: Number(candidate.energy.toFixed(3)),
+    trackGenre: candidate.trackGenre ?? null,
+    tempo: candidate.tempo ? Number(candidate.tempo.toFixed(2)) : null,
+    valence: candidate.valence != null ? Number(candidate.valence.toFixed(3)) : null,
+    acousticness: candidate.acousticness != null ? Number(candidate.acousticness.toFixed(3)) : null,
+    instrumentalness: candidate.instrumentalness != null ? Number(candidate.instrumentalness.toFixed(3)) : null,
+    speechiness: candidate.speechiness != null ? Number(candidate.speechiness.toFixed(3)) : null,
+  }));
+}
+
+async function chooseRecommendationsWithGemini(params: {
+  userMessage: string;
+  intent: ParsedIntent;
+  seedTrack: CandidateTrack | null;
+  candidates: CandidateTrack[];
+}): Promise<{ recommendation: GeminiRecommendation; modelId: string }> {
+  const { userMessage, intent, seedTrack, candidates } = params;
+  const result = await generateObjectWithModelFallback({
+    schema: recommendationSchema,
+    system: `You are MelodyMix's expert music curator.
+You MUST choose recommendations only from the provided candidateTracks list.
+Do not invent songs. Do not use songs outside candidateTracks.
+Priority order:
+1. Same language as the seed track or requested language/mood.
+2. Same or close genre. trackGenre is weak and may be wrong, so combine it with artist/title/album knowledge.
+3. Similar audio traits and vibe: danceability, energy, tempo, valence, acousticness, instrumentalness, speechiness, popularity, duration.
+Never choose the seed track itself.
+Return strict JSON only. No markdown.
+If candidateTracks contains enough useful tracks, return at least ${MIN_RECOMMENDATIONS} recommendations.
+Each recommendation should include the candidate id exactly as provided.`,
+    prompt: JSON.stringify({
+      userMessage,
+      intent,
+      minimumRecommendations: MIN_RECOMMENDATIONS,
+      seedTrack: seedTrack ? serializeCandidatesForGemini([seedTrack])[0] : null,
+      candidateTracks: serializeCandidatesForGemini(candidates),
+    }),
+  });
+
+  return { recommendation: result.object, modelId: result.modelId };
+}
+
+function buildPlaylistFromGemini(gemini: GeminiRecommendation, candidates: CandidateTrack[]): PlaylistResult {
+  const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  const bySourceId = new Map(candidates.map((candidate) => [candidate.sourceTrackId, candidate]));
+  const byTitleArtist = new Map(candidates.map((candidate) => [
+    `${normalizeText(candidate.title)}::${normalizeText(candidate.artist)}`,
+    candidate,
+  ]));
+  const seen = new Set<string>();
+  const playlist: PlaylistTrack[] = [];
+
+  for (const recommendation of gemini.recommendations) {
+    const titleArtistKey = `${normalizeText(recommendation.title)}::${normalizeText(recommendation.artist)}`;
+    const matched =
+      (recommendation.id ? byId.get(recommendation.id) : null) ??
+      (recommendation.sourceTrackId ? bySourceId.get(recommendation.sourceTrackId) : null) ??
+      byTitleArtist.get(titleArtistKey);
+
+    if (!matched || seen.has(matched.id)) continue;
+    seen.add(matched.id);
+    playlist.push({
+      id: matched.id,
+      name: matched.title,
+      artist: matched.artist,
+      album: matched.album,
+      similarity: recommendation.reason || "Gemini pick",
+    });
+  }
+
+  return {
+    seedFound: gemini.playlistName,
+    playlistName: gemini.playlistName,
+    playlist,
+    notFound: null,
+    matchedCount: playlist.length,
+    requestedCount: gemini.recommendations.length,
+  };
+}
+
+function friendlyErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "Unknown error";
+  if (/api key|API_KEY|credential/i.test(message)) {
+    return "Gemini chưa được cấu hình. Hãy kiểm tra GOOGLE_GENERATIVE_AI_API_KEY trong file .env.";
+  }
+  if (/quota|rate|429/i.test(message)) {
+    return "Gemini đang hết quota hoặc bị giới hạn tần suất. Vui lòng thử lại sau.";
+  }
+  if (/ECONNREFUSED|database|Prisma/i.test(message)) {
+    return "Mình chưa kết nối được database nên chưa thể kiểm tra bài hát trong thư viện app. Hãy bật database rồi thử lại nhé.";
+  }
+  return "Gemini hiện không khả dụng nên mình chưa thể tạo playlist theo yêu cầu này.";
+}
+
+function sendSse(controller: ReadableStreamDefaultController<Uint8Array>, data: object) {
+  const encoder = new TextEncoder();
+  controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+}
+
+async function handleRecommendation(userMessage: string, messages: ChatMessage[]) {
+  if (!hasGeminiKey()) {
+    throw new Error("Missing GOOGLE_GENERATIVE_AI_API_KEY");
+  }
+
+  const csvIndex = await loadCsvIndex();
+  const parsed = await parseIntentWithGemini(messages, userMessage);
+  const intent = parsed.intent;
+
+  if (intent.intent === "general_chat") {
+    const result = await generateObjectWithModelFallback({
+      schema: z.object({ reply: z.string().min(1) }),
+      system: "You are MelodyMix, a friendly music assistant. Reply naturally in the user's language. Do not recommend a playlist unless asked.",
+      prompt: JSON.stringify({ userMessage, recentMessages: messages.slice(-6) }),
+    });
+    return { reply: result.object.reply, playlistResult: null, modelId: result.modelId };
+  }
+
+  let seedTrack: CandidateTrack | null = null;
+  let candidates: CandidateTrack[] = [];
+
+  if (intent.intent === "similar_song") {
+    seedTrack = await findSeedTrack(intent, csvIndex);
+    if (!seedTrack) {
+      const label = [intent.songTitle, intent.artistName].filter(Boolean).join(" - ") || userMessage;
+      return {
+        reply: `Mình chưa tìm thấy "${label}" trong thư viện của app. Bạn thử nhập rõ hơn tên bài hát và nghệ sĩ nhé.`,
+        playlistResult: null,
+        modelId: parsed.modelId,
+      };
+    }
+    candidates = await buildSimilarCandidates(seedTrack, csvIndex);
+  } else {
+    candidates = await buildMoodCandidates(intent, csvIndex);
+  }
+
+  if (candidates.length === 0) {
+    return {
+      reply: "Mình chưa tìm được đủ bài hát trong thư viện app để gửi Gemini chọn playlist.",
+      playlistResult: null,
+      modelId: parsed.modelId,
+    };
+  }
+
+  const geminiResult = await chooseRecommendationsWithGemini({
+    userMessage,
+    intent,
+    seedTrack,
+    candidates,
+  });
+  const gemini = geminiResult.recommendation;
+  const playlistResult = buildPlaylistFromGemini(gemini, candidates);
+
+  let reply = gemini.reply;
+  if (playlistResult.playlist.length < MIN_RECOMMENDATIONS) {
+    reply += `\n\nMình chỉ match được ${playlistResult.playlist.length}/${gemini.recommendations.length} bài trong thư viện app, nên playlist chỉ gồm các bài có thể phát và lưu được.`;
+  }
+
+  return { reply, playlistResult, modelId: geminiResult.modelId };
+}
+
 export async function POST(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const stream = searchParams.get('stream') !== 'false';
+    const isStream = searchParams.get("stream") !== "false";
+    const body = await req.json();
+    const messages: ChatMessage[] = Array.isArray(body.messages) && body.messages.length > 0
+      ? body.messages
+          .filter((message: Partial<ChatMessage>) => message.role && message.content)
+          .map((message: ChatMessage) => ({ role: message.role, content: message.content }))
+      : [{ role: "user", content: body.message?.trim() ?? "" }];
+    const userMessage = messages[messages.length - 1]?.content?.trim();
 
-    if (stream) return handleStream(req);
-
-    // Non-streaming JSON mode
-    const { message } = await req.json();
-    const userMsg: string = message?.trim() ?? '';
-
-    if (!userMsg) {
-      return Response.json({ error: 'Message is required' }, { status: 400 });
+    if (!userMessage) {
+      return Response.json({ error: "Message is required" }, { status: 400 });
     }
 
-    const playlistData = await searchPlaylist(userMsg);
-    const systemContext = buildSystemContext(playlistData);
-    const { text, model } = await callGemini(userMsg, systemContext);
-    const finalText = text || generateFallbackText(userMsg, playlistData);
+    if (!isStream) {
+      try {
+        const { reply, playlistResult, modelId } = await handleRecommendation(userMessage, messages);
+        return Response.json({
+          reply,
+          model: modelId,
+          playlist: playlistResult?.playlist ?? null,
+          playlistName: playlistResult?.playlistName ?? null,
+          seedFound: playlistResult?.seedFound ?? null,
+        });
+      } catch (error) {
+        return Response.json({ reply: friendlyErrorMessage(error), model: PRIMARY_MODEL, playlist: null }, { status: 503 });
+      }
+    }
 
-    return Response.json({
-      reply: finalText,
-      model: model || null,
-      playlist: playlistData?.playlist?.slice(0, 20) ?? null,
-      seedFound: playlistData?.seedFound || playlistData?.categoryLabel || null,
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          sendSse(controller, { type: "start" });
+          sendSse(controller, { type: "text-start", id: "0" });
+          sendSse(controller, {
+            type: "text-delta",
+            id: "0",
+            delta: "Mình đang phân tích bài hát và chọn playlist từ thư viện app...\n\n",
+          });
+
+          const { reply, playlistResult, modelId } = await handleRecommendation(userMessage, messages);
+          sendSse(controller, { type: "text-delta", id: "0", delta: reply });
+
+          if (playlistResult && playlistResult.playlist.length > 0) {
+            sendSse(controller, {
+              type: "tool-result",
+              result: {
+                seedFound: playlistResult.seedFound,
+                playlistName: playlistResult.playlistName,
+                playlist: playlistResult.playlist,
+                matchedCount: playlistResult.matchedCount,
+                requestedCount: playlistResult.requestedCount,
+                model: modelId,
+              },
+            });
+          }
+
+          sendSse(controller, { type: "text-end", id: "0" });
+          sendSse(controller, { type: "finish", finishReason: "stop" });
+        } catch (error) {
+          console.error("[Chat] Gemini-grounded recommendation failed:", error);
+          sendSse(controller, { type: "text-delta", id: "0", delta: friendlyErrorMessage(error) });
+          sendSse(controller, { type: "error", error: friendlyErrorMessage(error) });
+        } finally {
+          controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+          controller.close();
+        }
+      },
     });
-  } catch (err: unknown) {
-    const msg = (err as Error)?.message ?? 'Unknown error';
-    console.error('[Chat] Fatal error:', msg);
-    return Response.json({ error: msg }, { status: 500 });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Chat] Fatal error:", message);
+    return Response.json({ error: message }, { status: 500 });
   }
 }
