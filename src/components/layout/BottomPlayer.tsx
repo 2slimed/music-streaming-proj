@@ -81,10 +81,10 @@ export function BottomPlayer() {
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 px-2 pb-2 md:px-6 md:pb-6 pointer-events-none">
+    <div className="fixed bottom-0 left-0 right-0 z-50 px-2 pb-2 md:bottom-6 md:left-[17rem] md:right-6 md:px-0 md:pb-0 pointer-events-none">
       <GlassWindow
         intensity="medium"
-        className="pointer-events-auto h-20 md:h-24 w-full max-w-7xl mx-auto flex items-center justify-between gap-3 px-3 md:px-8 border-t-0 md:rounded-2xl shadow-2xl"
+        className="pointer-events-auto h-18 min-h-18 md:h-24 w-full max-w-7xl mx-auto md:max-w-none md:mx-0 flex items-center justify-between gap-3 px-3 md:px-8 border-t-0 md:rounded-2xl shadow-2xl"
       >
         {/* Song Info */}
         <div className="flex min-w-0 flex-1 items-center gap-3 md:w-1/4 md:min-w-[200px] md:gap-4">

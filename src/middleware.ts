@@ -25,6 +25,8 @@ const PUBLIC_API_ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/playlists", methods: ["GET"] },
   { path: "/api/albums", methods: ["GET"] },
   { path: "/api/artists", methods: ["GET"] },
+  { path: "/api/chat", methods: ["POST"] },
+  { path: "/api/chatbot", methods: ["POST"] },
 ];
 
 function isPublicApiRoute(pathname: string, method: string): boolean {

@@ -19,7 +19,7 @@ export default function RootLayout({
       <body className="flex h-screen bg-background overflow-hidden selection:bg-accent selection:text-white">
         <Providers>
           <Sidebar />
-          <main className="flex-1 relative overflow-y-auto pb-32 pt-16 md:pt-0">
+          <main className="flex-1 relative overflow-y-auto pb-28 pt-16 md:pb-32 md:pt-0 scrollbar-themed">
             {children}
           </main>
           <BottomPlayer />

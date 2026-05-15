@@ -63,6 +63,13 @@ export default function AlbumPage({
     setToggling(true);
     try {
       if (isSaved && savedEntry) {
+        queryClient.setQueryData(["saved-albums", albumName], (current: typeof savedAlbumsData | undefined) => {
+          if (!current) return current;
+          return {
+            ...current,
+            data: current.data.filter((item) => item.id !== savedEntry.id),
+          };
+        });
         await api.library.albums.unsave(savedEntry.albumId);
       } else {
         const matchingAlbums = await api.albums.list({ name: albumName, limit: 1 });
@@ -71,10 +78,40 @@ export default function AlbumPage({
           console.error("Album record not found in DB for name:", albumName);
           return;
         }
+        queryClient.setQueryData(["saved-albums", albumName], (current: typeof savedAlbumsData | undefined) => {
+          if (!current) {
+            return {
+              data: [{ id: "temp", userId: session?.user?.id ?? "", albumId: album.id, savedAt: new Date().toISOString(), album }],
+              meta: { page: 1, limit: 1, total: 1, totalPages: 1 },
+            };
+          }
+          if (current.data.some((item) => item.albumId === album.id)) return current;
+          return {
+            ...current,
+            data: [
+              {
+                id: "temp",
+                userId: session?.user?.id ?? "",
+                albumId: album.id,
+                savedAt: new Date().toISOString(),
+                album,
+              },
+              ...current.data,
+            ],
+            meta: {
+              ...current.meta,
+              total: current.meta.total + 1,
+            },
+          };
+        });
         await api.library.albums.save(album.id);
       }
       queryClient.invalidateQueries({ queryKey: ["saved-albums"] });
       queryClient.invalidateQueries({ queryKey: ["sidebar-saved-albums"] });
+    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ["saved-albums"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-saved-albums"] });
+      throw error;
     } finally {
       setToggling(false);
     }
