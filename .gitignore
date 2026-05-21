@@ -13,6 +13,9 @@
 # agents
 /.commandcode
 
+# documentation
+/docs
+
 # testing
 /coverage
 /.playwright-mcp/
