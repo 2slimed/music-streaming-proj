@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Bot, Loader2, Music, Plus, Save, Send, Sparkles, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -29,6 +29,7 @@ interface PlaylistTrack {
 
 interface PlaylistData {
   seedFound: string;
+  playlistName?: string;
   playlist: PlaylistTrack[];
 }
 
@@ -40,6 +41,44 @@ const initialMessages: ChatMessage[] = [
       "Chào bạn, mình là trợ lý AI MelodyMix. Hỏi mình về playlist, tâm trạng nghe nhạc, hoặc tìm bài hát bạn muốn nhé!",
   },
 ];
+
+const CHATBOT_STORAGE_KEY = "melodymix-chatbot-state-v1";
+
+type StoredChatbotState = {
+  messages?: ChatMessage[];
+  playlist?: PlaylistData | null;
+  savedPlaylistId?: string | null;
+};
+
+function readStoredChatbotState(): StoredChatbotState | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(CHATBOT_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as StoredChatbotState;
+  } catch {
+    return null;
+  }
+}
+
+function restoreMessages(): ChatMessage[] {
+  const stored = readStoredChatbotState();
+  if (!stored?.messages?.length) return initialMessages;
+
+  return stored.messages
+    .filter((message) => message.role && typeof message.content === "string")
+    .map((message) => ({ ...message, isStreaming: false }));
+}
+
+function restorePlaylist(): PlaylistData | null {
+  const stored = readStoredChatbotState();
+  return stored?.playlist?.playlist?.length ? stored.playlist : null;
+}
+
+function restoreSavedPlaylistId(): string | null {
+  return readStoredChatbotState()?.savedPlaylistId ?? null;
+}
 
 function createMessage(role: ChatMessage["role"], content: string, isStreaming?: boolean): ChatMessage {
   return {
@@ -141,6 +180,54 @@ function splitArtistNames(artists: string): string[] {
     .filter(Boolean);
 }
 
+function PlaylistTrackCard({
+  track,
+  index,
+  playingTrackId,
+  onPlay,
+}: {
+  track: PlaylistTrack;
+  index: number;
+  playingTrackId: string | null;
+  onPlay: (trackId: string) => void;
+}) {
+  return (
+    <div
+      key={`${track.id || track.name}-${index}`}
+      className="rounded-xl border border-white/5 bg-white/5 px-3 py-2.5 transition-colors hover:bg-white/10"
+    >
+      <button
+        type="button"
+        disabled={playingTrackId === track.id}
+        onClick={() => onPlay(track.id)}
+        className="block w-full min-w-0 text-left text-sm font-semibold leading-5 text-foreground transition-colors hover:text-accent hover:underline disabled:cursor-wait disabled:text-muted"
+      >
+        <span className="block break-words">{track.name}</span>
+      </button>
+
+      <div className="mt-1 flex min-w-0 flex-wrap gap-x-1 gap-y-0.5 text-xs leading-5 text-muted">
+        {splitArtistNames(track.artist).map((artist, artistIndex, artists) => (
+          <span key={`${track.id}-${artist}-${artistIndex}`} className="min-w-0 max-w-full">
+            <Link
+              href={`/artist/${encodeURIComponent(artist)}`}
+              className="break-words transition-colors hover:text-accent hover:underline"
+            >
+              {artist}
+            </Link>
+            {artistIndex < artists.length - 1 && ","}
+          </span>
+        ))}
+      </div>
+
+      {track.similarity && (
+        <p className="mt-2 rounded-lg bg-accent/10 px-2 py-1 text-[11px] font-medium leading-4 text-accent/90 [overflow-wrap:anywhere]">
+          {track.similarity}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ChatbotPage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
@@ -152,10 +239,30 @@ export default function ChatbotPage() {
   const [savedPlaylistId, setSavedPlaylistId] = useState<string | null>(null);
   const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [hasRestoredChat, setHasRestoredChat] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const playTrack = usePlayerStore((state) => state.playTrack);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !isLoading, [draft, isLoading]);
+
+  useEffect(() => {
+    setMessages(restoreMessages());
+    setPlaylist(restorePlaylist());
+    setSavedPlaylistId(restoreSavedPlaylistId());
+    setHasRestoredChat(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasRestoredChat) return;
+
+    const persistedMessages = messages
+      .filter((message) => message.role === "user" || message.content.trim().length > 0)
+      .map((message) => ({ ...message, isStreaming: false }));
+    window.localStorage.setItem(
+      CHATBOT_STORAGE_KEY,
+      JSON.stringify({ messages: persistedMessages, playlist, savedPlaylistId }),
+    );
+  }, [hasRestoredChat, messages, playlist, savedPlaylistId]);
 
   function scrollToBottom() {
     setTimeout(() => {
@@ -169,7 +276,7 @@ export default function ChatbotPage() {
     setIsSaving(true);
     try {
       const songName = playlist.seedFound || "bài hát";
-      const playlistName = `Gợi ý tương tự ${songName.split(" — ")[0] || songName}`;
+      const playlistName = playlist.playlistName || `Gợi ý từ Gemini - ${songName.split(" — ")[0] || songName}`;
 
       const created = await fetch("/api/playlists", {
         method: "POST",
@@ -238,10 +345,15 @@ export default function ChatbotPage() {
     scrollToBottom();
 
     try {
+      const currentMessages = [...messages, userMessage].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
       const res = await fetch("/api/chat?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ messages: currentMessages, message: content }),
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -290,6 +402,7 @@ export default function ChatbotPage() {
                   hasPlaylist = true;
                   setPlaylist({
                     seedFound: event.result.seedFound,
+                    playlistName: event.result.playlistName,
                     playlist: event.result.playlist ?? [],
                   });
                 }
@@ -340,7 +453,7 @@ export default function ChatbotPage() {
   }
 
   return (
-    <div className="h-[calc(100dvh-14rem)] overflow-hidden p-4 md:h-[calc(100dvh-8rem)] md:min-h-0 md:overflow-hidden md:p-5 lg:p-6 xl:p-8">
+    <div className="h-[calc(100dvh-14rem)] overflow-hidden p-4 md:h-[calc(100dvh-11rem)] md:min-h-0 md:overflow-hidden md:p-5 lg:p-6 xl:p-8">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-4 md:gap-4 lg:gap-5">
         <header className="shrink-0 space-y-3">
           <div className="flex items-start justify-between gap-3">
@@ -383,7 +496,7 @@ export default function ChatbotPage() {
                     Listening Assistant
                   </Typography>
                   <Typography variant="caption" color="muted">
-                    Gemini AI · KNN tìm nhạc tương tự
+                    Gemini AI · gợi ý từ dataset của app
                   </Typography>
                 </div>
               </div>
@@ -471,8 +584,8 @@ export default function ChatbotPage() {
 
           {/* ─── Playlist sidebar ────────────────────────────────── */}
           {playlist && playlist.playlist.length > 0 && isMobilePlaylistOpen && (
-            <div className="fixed inset-x-4 bottom-28 z-40 max-h-[46dvh] overflow-hidden xl:hidden">
-              <GlassWindow className="flex max-h-[46dvh] flex-col rounded-2xl border border-white/10 bg-black/80 backdrop-blur-xl" intensity="medium">
+            <div className="fixed inset-x-4 bottom-28 z-40 h-[46dvh] overflow-hidden xl:hidden">
+              <GlassWindow className="flex h-full min-h-0 flex-col rounded-2xl border border-white/10 bg-black/80 backdrop-blur-xl" intensity="medium">
                 <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Music className="h-5 w-5 text-accent" />
@@ -491,54 +604,29 @@ export default function ChatbotPage() {
                   </Button>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                <div className="shrink-0 px-4 py-3">
                   {playlist.seedFound && (
-                    <Typography variant="caption" color="muted" className="mb-3 block">
-                      Tương tự: <span className="text-accent">{playlist.seedFound}</span>
+                    <Typography variant="caption" color="muted" className="block">
+                      Playlist: <span className="text-accent">{playlist.playlistName || playlist.seedFound}</span>
                     </Typography>
                   )}
+                </div>
 
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">
                   <div className="space-y-2">
                     {playlist.playlist.map((track, i) => (
-                      <div
+                      <PlaylistTrackCard
                         key={`${track.id || track.name}-${i}`}
-                        className="rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <button
-                              type="button"
-                              disabled={playingTrackId === track.id}
-                              onClick={() => handlePlayGeneratedTrack(track.id)}
-                              className="block min-w-0 text-left text-sm font-medium leading-5 text-foreground transition-colors hover:text-accent hover:underline disabled:cursor-wait disabled:text-muted"
-                            >
-                              <span className="line-clamp-2 break-words">{track.name}</span>
-                            </button>
-                            <div className="flex min-w-0 flex-wrap gap-x-1 gap-y-0.5 text-xs leading-5 text-muted">
-                              {splitArtistNames(track.artist).map((artist, artistIndex, artists) => (
-                                <span key={`${track.id}-${artist}`} className="min-w-0">
-                                  <Link
-                                    href={`/artist/${encodeURIComponent(artist)}`}
-                                    className="break-words transition-colors hover:text-accent hover:underline"
-                                  >
-                                    {artist}
-                                  </Link>
-                                  {artistIndex < artists.length - 1 && ","}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          {track.similarity && (
-                            <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
-                              {track.similarity}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                        track={track}
+                        index={i}
+                        playingTrackId={playingTrackId}
+                        onPlay={handlePlayGeneratedTrack}
+                      />
                     ))}
                   </div>
+                </div>
 
-                  <div className="mt-4 border-t border-white/10 pt-3 space-y-2">
+                  <div className="shrink-0 space-y-2 border-t border-white/10 px-4 py-3">
                     {session?.user ? (
                       savedPlaylistId ? (
                         <div className="space-y-2">
@@ -573,14 +661,13 @@ export default function ChatbotPage() {
                       </Typography>
                     )}
                   </div>
-                </div>
               </GlassWindow>
             </div>
           )}
           {playlist && playlist.playlist.length > 0 && (
-            <div className="hidden w-80 shrink-0 xl:block">
-              <GlassWindow className="sticky top-6 max-h-[calc(100dvh-20rem)] overflow-y-auto rounded-2xl p-5" intensity="medium">
-                <div className="mb-4 flex items-center gap-2">
+            <div className="hidden w-[26rem] shrink-0 xl:flex xl:min-h-0">
+              <GlassWindow className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl p-5" intensity="medium">
+                <div className="mb-4 flex shrink-0 items-center gap-2">
                   <Music className="h-5 w-5 text-accent" />
                   <Typography variant="h4" className="text-base">
                     Playlist gợi ý
@@ -588,52 +675,24 @@ export default function ChatbotPage() {
                 </div>
 
                 {playlist.seedFound && (
-                  <Typography variant="caption" color="muted" className="mb-3 block">
-                    Tương tự: <span className="text-accent">{playlist.seedFound}</span>
+                  <Typography variant="caption" color="muted" className="mb-3 block shrink-0">
+                    Playlist: <span className="text-accent">{playlist.playlistName || playlist.seedFound}</span>
                   </Typography>
                 )}
 
-                <div className="space-y-2">
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                   {playlist.playlist.map((track, i) => (
-                    <div
+                    <PlaylistTrackCard
                       key={`${track.id || track.name}-${i}`}
-                      className="rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <button
-                            type="button"
-                            disabled={playingTrackId === track.id}
-                            onClick={() => handlePlayGeneratedTrack(track.id)}
-                            className="block min-w-0 text-left text-sm font-medium leading-5 text-foreground transition-colors hover:text-accent hover:underline disabled:cursor-wait disabled:text-muted"
-                          >
-                            <span className="line-clamp-2 break-words">{track.name}</span>
-                          </button>
-                          <div className="flex min-w-0 flex-wrap gap-x-1 gap-y-0.5 text-xs leading-5 text-muted">
-                            {splitArtistNames(track.artist).map((artist, artistIndex, artists) => (
-                              <span key={`${track.id}-${artist}`} className="min-w-0">
-                                <Link
-                                  href={`/artist/${encodeURIComponent(artist)}`}
-                                  className="break-words transition-colors hover:text-accent hover:underline"
-                                >
-                                  {artist}
-                                </Link>
-                                {artistIndex < artists.length - 1 && ","}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        {track.similarity && (
-                          <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
-                            {track.similarity}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                      track={track}
+                      index={i}
+                      playingTrackId={playingTrackId}
+                      onPlay={handlePlayGeneratedTrack}
+                    />
                   ))}
                 </div>
 
-                <div className="mt-4 border-t border-white/10 pt-3 space-y-2">
+                <div className="mt-4 shrink-0 space-y-2 border-t border-white/10 pt-3">
                   {session?.user ? (
                     savedPlaylistId ? (
                       <div className="space-y-2">

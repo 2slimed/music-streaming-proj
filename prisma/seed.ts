@@ -2,7 +2,8 @@
  * prisma/seed.ts
  *
  * Seeds the database from `data/dataset.csv` (Kaggle Spotify dataset).
- * Usage:  npx tsx prisma/seed.ts
+ * Usage:  npx tsx prisma/seed.ts [rowCount]
+ * Example: npx tsx prisma/seed.ts 1000
  *
  * All five feature columns are pre-normalized to 0-1 for AI vector lookup:
  *   popularityNorm   = popularity / 100
@@ -28,6 +29,7 @@ const connectionString = process.env.DATABASE_URL ?? "";
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
+const DEFAULT_ROW_COUNT = 200;
 
 interface CsvRow {
   track_id: string;
@@ -91,6 +93,20 @@ function parseCsv(filePath: string): CsvRow[] {
   }
 
   return rows;
+}
+
+function getSeedRowCount(argv: string[]): number {
+  const rawRowCount = argv[2];
+  if (rawRowCount == null) return DEFAULT_ROW_COUNT;
+
+  const rowCount = Number(rawRowCount);
+  if (!Number.isInteger(rowCount) || rowCount < 1) {
+    throw new Error(
+      `Invalid row count "${rawRowCount}". Usage: npx tsx prisma/seed.ts [positive-integer-row-count]`,
+    );
+  }
+
+  return rowCount;
 }
 
 function normalize(t: {
@@ -204,7 +220,8 @@ async function main() {
     process.exit(1);
   }
 
-  const rows = parseCsv(csvPath).slice(0, 200);
+  const rowCount = getSeedRowCount(process.argv);
+  const rows = parseCsv(csvPath).slice(0, rowCount);
   console.log(`Parsed ${rows.length} rows from CSV. Seeding...`);
 
   let seeded = 0;
