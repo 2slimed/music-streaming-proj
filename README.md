@@ -32,16 +32,24 @@ cp .env.example .env
 Edit `.env` and fill in the required values:
 
 ```env
-# Required
-DATABASE_URL="postgresql://user:password@localhost:5432/melodymix"
+# ---- Database (PostgreSQL) -------------------------------------------------
+DATABASE_URL="postgresql://user:password@localhost:5432/melodymix?schema=public"
+
+# ---- NextAuth / Auth.js ----------------------------------------------------
 AUTH_SECRET="generate-with: npx auth secret"
 AUTH_URL="http://localhost:3000"
 
-# Optional — Google OAuth
+# ---- Google OAuth (optional) -----------------------------------------------
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
 
-# Optional — Spotify (not needed for streaming, Deezer is used instead)
+# ---- Google Gemini AI (for chatbot) ----------------------------------------
+# Get your key at: https://aistudio.google.com/apikey
+GOOGLE_GENERATIVE_AI_API_KEY=""
+
+# ---- Spotify API (optional, not required for streaming) --------------------
+# Audio previews use the Deezer API (free, no key). These are retained for
+# potential future metadata enrichment only.
 SPOTIFY_CLIENT_ID=""
 SPOTIFY_CLIENT_SECRET=""
 ```
