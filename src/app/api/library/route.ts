@@ -60,6 +60,9 @@ export async function POST(request: Request) {
     if (!track) {
       return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
+    if (track.moderationStatus !== "APPROVED") {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
 
     const item = await prisma.libraryItem.upsert({
       where: { userId_trackId: { userId: session.user.id, trackId } },

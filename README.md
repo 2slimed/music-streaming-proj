@@ -9,6 +9,7 @@ A hybrid music streaming web app built with Next.js, featuring AI-curated playli
 - **Auth:** Auth.js v5 (NextAuth) — Credentials + Google OAuth
 - **Streaming:** Deezer API (free 30s previews, no key required)
 - **Styling:** Tailwind CSS + Glassmorphism design system
+- **Roles:** Listener, Artist Studio, and Admin moderation workflows
 
 ## Prerequisites
 
@@ -71,6 +72,14 @@ npx tsx prisma/seed.ts
 
 The seed script imports `data/dataset.csv` (50-row sample included). To use the full 114k-row Kaggle dataset, replace the file and re-run the seed.
 
+The seed also creates role-based demo accounts using password `MelodyMix123!`:
+
+| Role | Email |
+|------|-------|
+| Listener | `listener@melodymix.test` |
+| Artist | `artist@melodymix.test` |
+| Admin | `admin@melodymix.test` |
+
 ### 4. Start the dev server
 
 ```bash
@@ -102,6 +111,14 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | GET | `/api/profile` | **Yes** | User profile |
 | PATCH | `/api/profile` | **Yes** | Update profile |
 | GET | `/api/profile/recent-plays` | **Yes** | Recent play history |
+| GET | `/api/artist-studio/summary` | **Artist/Admin** | Artist dashboard metrics |
+| GET/POST | `/api/artist-studio/claims` | **Yes** | View or submit artist claims |
+| PATCH | `/api/artist-studio/profile` | **Artist/Admin** | Edit approved artist profile |
+| GET/POST | `/api/artist-studio/tracks` | **Artist/Admin** | View or submit artist tracks |
+| GET | `/api/admin/summary` | **Admin** | Platform metrics |
+| GET/PATCH | `/api/admin/users` | **Admin** | Manage user roles |
+| GET/PATCH | `/api/admin/artist-claims` | **Admin** | Moderate artist claims |
+| GET/PATCH | `/api/admin/tracks` | **Admin** | Moderate submitted tracks |
 
 ## Project Structure
 

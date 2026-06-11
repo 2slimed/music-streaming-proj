@@ -6,6 +6,8 @@ import { Bot, Loader2, Music, Plus, Save, Send, Sparkles, UserRound } from "luci
 import { Button } from "@/components/ui/Button";
 import { GlassWindow } from "@/components/ui/GlassWindow";
 import { Typography } from "@/components/ui/Typography";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -453,8 +455,10 @@ export default function ChatbotPage() {
   }
 
   return (
+    <PageTransition>
     <div className="h-[calc(100dvh-14rem)] overflow-hidden p-4 md:h-[calc(100dvh-11rem)] md:min-h-0 md:overflow-hidden md:p-5 lg:p-6 xl:p-8">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-4 md:gap-4 lg:gap-5">
+        <FadeIn>
         <header className="shrink-0 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -482,7 +486,9 @@ export default function ChatbotPage() {
             )}
           </div>
         </header>
+        </FadeIn>
 
+        <FadeIn delay={0.1}>
         <div className="flex min-h-0 flex-1 gap-6">
           {/* ─── Chat panel ──────────────────────────────────────── */}
           <GlassWindow className="flex min-h-0 flex-1 flex-col rounded-2xl" intensity="medium">
@@ -731,7 +737,9 @@ export default function ChatbotPage() {
             </div>
           )}
         </div>
+        </FadeIn>
       </div>
     </div>
+    </PageTransition>
   );
 }

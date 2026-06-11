@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       >`
         SELECT a.*, AVG(t.popularity) AS avg_popularity
         FROM "Album" a
-        LEFT JOIN "Track" t ON t."albumName" = a.name AND t."artists" = a.artists
+        LEFT JOIN "Track" t ON t."albumName" = a.name AND t."artists" = a.artists AND t."moderationStatus" = 'APPROVED'
         GROUP BY a.id
         ORDER BY avg_popularity DESC NULLS LAST
         LIMIT ${limit} OFFSET ${(page - 1) * limit}

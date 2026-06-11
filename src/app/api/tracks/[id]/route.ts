@@ -14,7 +14,7 @@ export async function GET(
     const { id } = await params;
 
     const track = await prisma.track.findFirst({
-      where: { OR: [{ id }, { trackId: id }] },
+      where: { moderationStatus: "APPROVED", OR: [{ id }, { trackId: id }] },
     });
 
     if (!track) {

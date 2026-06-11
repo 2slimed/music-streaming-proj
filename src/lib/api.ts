@@ -7,6 +7,12 @@ import type {
   LibraryItem,
   SavedAlbum,
   UserProfile,
+  UserRole,
+  ModerationStatus,
+  ArtistClaim,
+  ArtistStudioSummary,
+  AdminSummary,
+  AdminUser,
   PaginatedResponse,
   SearchResults,
 } from "@/types/api";
@@ -170,7 +176,7 @@ export const api = {
   },
 
   artists: {
-    list(params?: { page?: number; limit?: number }) {
+    list(params?: { page?: number; limit?: number; q?: string }) {
       return apiFetch<PaginatedResponse<Artist>>(
         `/api/artists${qs(params ?? {})}`,
       );
@@ -195,6 +201,92 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(body),
       });
+    },
+  },
+
+  artistStudio: {
+    summary() {
+      return apiFetch<ArtistStudioSummary>("/api/artist-studio/summary");
+    },
+    claims: {
+      list() {
+        return apiFetch<{ data: ArtistClaim[] }>("/api/artist-studio/claims");
+      },
+      create(body: { artistId: string; note?: string }) {
+        return apiFetch<ArtistClaim>("/api/artist-studio/claims", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+      },
+    },
+    profile: {
+      update(body: { artistId: string; bio?: string | null; imageUrl?: string | null }) {
+        return apiFetch<Artist>("/api/artist-studio/profile", {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+      },
+    },
+    tracks: {
+      list(params?: { status?: ModerationStatus }) {
+        return apiFetch<{ data: Track[] }>(`/api/artist-studio/tracks${qs(params ?? {})}`);
+      },
+      create(body: {
+        artistId: string;
+        trackName: string;
+        albumName: string;
+        artists?: string;
+        durationMs: number;
+        explicit: boolean;
+        danceability: number;
+        energy: number;
+        previewUrl?: string;
+        coverUrl?: string;
+      }) {
+        return apiFetch<Track>("/api/artist-studio/tracks", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+      },
+    },
+  },
+
+  admin: {
+    summary() {
+      return apiFetch<AdminSummary>("/api/admin/summary");
+    },
+    users: {
+      list(params?: { page?: number; limit?: number }) {
+        return apiFetch<PaginatedResponse<AdminUser>>(`/api/admin/users${qs(params ?? {})}`);
+      },
+      updateRole(userId: string, role: UserRole) {
+        return apiFetch<AdminUser>("/api/admin/users", {
+          method: "PATCH",
+          body: JSON.stringify({ userId, role }),
+        });
+      },
+    },
+    artistClaims: {
+      list(params?: { status?: ModerationStatus }) {
+        return apiFetch<{ data: ArtistClaim[] }>(`/api/admin/artist-claims${qs(params ?? {})}`);
+      },
+      update(claimId: string, status: ModerationStatus) {
+        return apiFetch<ArtistClaim>("/api/admin/artist-claims", {
+          method: "PATCH",
+          body: JSON.stringify({ claimId, status }),
+        });
+      },
+    },
+    tracks: {
+      list(params?: { status?: ModerationStatus }) {
+        return apiFetch<{ data: Track[] }>(`/api/admin/tracks${qs(params ?? {})}`);
+      },
+      update(trackId: string, status: ModerationStatus) {
+        return apiFetch<Track>("/api/admin/tracks", {
+          method: "PATCH",
+          body: JSON.stringify({ trackId, status }),
+        });
+      },
     },
   },
 

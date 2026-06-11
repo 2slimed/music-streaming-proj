@@ -4,6 +4,8 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TrackListItem } from "@/components/ui/TrackListItem";
 import { Typography } from "@/components/ui/Typography";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { Disc3 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -40,8 +42,10 @@ export default function ArtistPage({
   });
 
   return (
+    <PageTransition>
     <div className="flex flex-col h-full overflow-y-auto bg-background">
       {/* Artist Header */}
+      <FadeIn>
       <div className="relative h-64 md:h-80 w-full flex items-end p-6 md:p-10 shrink-0">
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent z-10" />
         {artist?.imageUrl ? (
@@ -99,8 +103,10 @@ export default function ArtistPage({
           </div>
         </div>
       </div>
+      </FadeIn>
 
       {/* Track List */}
+      <FadeIn delay={0.1}>
       <div className="flex-1 px-6 md:px-10 pb-20 space-y-12">
         <section className="space-y-4">
           <Typography variant="h3" className="font-bold">
@@ -170,6 +176,8 @@ export default function ArtistPage({
           </section>
         )}
       </div>
+      </FadeIn>
     </div>
+    </PageTransition>
   );
 }

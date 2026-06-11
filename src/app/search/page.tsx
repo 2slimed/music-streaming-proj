@@ -6,6 +6,8 @@ import { Typography } from "@/components/ui/Typography";
 import { TrackListItem } from "@/components/ui/TrackListItem";
 import { AlbumGrid } from "@/components/ui/AlbumGrid";
 import { ScrollRow } from "@/components/ui/ScrollRow";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { Search, X, Disc3 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Playlist, Artist } from "@/types/api";
@@ -49,8 +51,10 @@ export default function SearchPage() {
   const hasResults = tracks.length > 0 || albums.length > 0 || artists.length > 0 || playlists.length > 0;
 
   return (
+    <PageTransition>
     <div className="p-6 md:p-10 space-y-8">
       {/* Search Header */}
+      <FadeIn>
       <div className="space-y-6">
         <Typography variant="h1">Search</Typography>
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -90,18 +94,22 @@ export default function SearchPage() {
           </div>
         </div>
       </div>
+      </FadeIn>
 
       {/* Loading — only shown on the very first search, not on subsequent refetches */}
       {isLoading && !results && debouncedQuery && (
+        <FadeIn>
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-16 bg-surface animate-pulse rounded-md" />
           ))}
         </div>
+        </FadeIn>
       )}
 
       {/* Results */}
       {results && debouncedQuery && (
+        <FadeIn>
         <>
           {activeTab === "all" ? (
             <>
@@ -398,16 +406,20 @@ export default function SearchPage() {
             </div>
           )}
         </>
+        </FadeIn>
       )}
 
       {/* Empty state */}
       {!debouncedQuery && (
+        <FadeIn>
         <div className="py-12 text-center">
           <Typography variant="body" color="muted">
             Start typing to search for tracks, albums, artists, and playlists
           </Typography>
         </div>
+        </FadeIn>
       )}
     </div>
+    </PageTransition>
   );
 }

@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { GlassWindow } from "@/components/ui/GlassWindow";
 import { TrackListItem } from "@/components/ui/TrackListItem";
 import { PlaylistModal } from "@/components/ui/PlaylistModal";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { Play, Pencil, Trash2, Clock, Sparkles } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { api } from "@/lib/api";
@@ -98,8 +100,10 @@ export default function PlaylistPage({
   const isOwner = session?.user?.id === playlist.userId;
 
   return (
+    <PageTransition>
     <div className="space-y-8 pb-10">
       {/* Playlist Header Block */}
+      <FadeIn>
       <div className="w-full h-[400px] relative overflow-hidden flex items-start md:items-end p-6 md:p-10">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 via-background to-background z-0" />
 
@@ -146,8 +150,10 @@ export default function PlaylistPage({
           </div>
         </div>
       </div>
+      </FadeIn>
 
       {/* Action Buttons */}
+      <FadeIn delay={0.05}>
       <div className="px-6 md:px-10 flex items-center gap-4">
         <Button
           variant="default"
@@ -179,6 +185,7 @@ export default function PlaylistPage({
           </>
         )}
       </div>
+      </FadeIn>
 
       {/* Edit Playlist Modal */}
       <PlaylistModal
@@ -220,6 +227,7 @@ export default function PlaylistPage({
       )}
 
       {/* Track List */}
+      <FadeIn delay={0.1}>
       <div className="px-6 md:px-10">
         <div className="w-full border-b border-white/5 pb-2 mb-4 flex px-4">
           <Typography variant="caption" color="muted" className="w-12">
@@ -265,6 +273,8 @@ export default function PlaylistPage({
           </div>
         )}
       </div>
+      </FadeIn>
     </div>
+    </PageTransition>
   );
 }

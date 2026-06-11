@@ -27,6 +27,18 @@ enum PlaylistPrivacy {
   PRIVATE
 }
 
+enum UserRole {
+  LISTENER
+  ARTIST
+  ADMIN
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ---- Auth.js required models ---------------------------------------------
 
 model Account {
@@ -74,15 +86,18 @@ model User {
   emailVerified DateTime?
   image         String?
   passwordHash  String?
+  role          UserRole  @default(LISTENER)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts     Account[]
-  sessions     Session[]
-  playlists    Playlist[]
-  libraryItems LibraryItem[]
-  savedAlbums  SavedAlbum[]
+  accounts        Account[]
+  sessions        Session[]
+  playlists       Playlist[]
+  libraryItems    LibraryItem[]
+  savedAlbums     SavedAlbum[]
+  artistClaims    ArtistClaim[]
+  submittedTracks Track[]       @relation("SubmittedTracks")
 }
 
 model Track {
@@ -116,17 +131,27 @@ model Track {
   previewUrl   String?
   coverUrl     String?
 
+  // Artist-submitted tracks are hidden from public catalog/search until approved.
+  moderationStatus ModerationStatus @default(APPROVED)
+  submittedById    String?
+  artistOwnerId    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   playlistTracks PlaylistTrack[]
   libraryItems   LibraryItem[]
+  submittedBy    User?           @relation("SubmittedTracks", fields: [submittedById], references: [id], onDelete: SetNull)
+  artistOwner    Artist?         @relation(fields: [artistOwnerId], references: [id], onDelete: SetNull)
 
   @@index([trackName])
   @@index([artists])
   @@index([albumName])
   @@index([popularity])
+  @@index([moderationStatus])
+  @@index([submittedById])
+  @@index([artistOwnerId])
 }
 
 model Album {
@@ -167,6 +192,28 @@ model Artist {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  claims ArtistClaim[]
+  submittedTracks Track[]
+}
+
+model ArtistClaim {
+  id       String           @id @default(cuid())
+  userId   String
+  artistId String
+  status   ModerationStatus @default(PENDING)
+  note     String?          @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, artistId])
+  @@index([userId])
+  @@index([artistId])
+  @@index([status])
 }
 
 model Playlist {

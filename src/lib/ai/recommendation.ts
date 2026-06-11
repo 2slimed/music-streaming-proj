@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 
 type FeatureVector = [number, number, number, number, number];
 
@@ -44,7 +45,7 @@ function cosineSimilarity(a: FeatureVector, b: FeatureVector): number {
 }
 
 export async function findSeedSong(query: string): Promise<SeedTrack | null> {
-  let whereClause: any = {
+  let whereClause: Prisma.TrackWhereInput = {
     OR: [
       { trackName: { contains: query, mode: "insensitive" } },
       { artists: { contains: query, mode: "insensitive" } },

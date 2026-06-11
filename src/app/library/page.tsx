@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { Typography } from "@/components/ui/Typography";
 import { TrackListItem } from "@/components/ui/TrackListItem";
 import { ScrollRow } from "@/components/ui/ScrollRow";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { Play, Heart, Disc3 } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { api } from "@/lib/api";
@@ -72,11 +74,15 @@ export default function LibraryPage() {
   }
 
   return (
+    <PageTransition>
     <div className="p-6 md:p-10 space-y-8">
+      <FadeIn>
       <div className="border-b border-white/5 pb-6">
         <Typography variant="h1">Library</Typography>
       </div>
+      </FadeIn>
 
+      <FadeIn delay={0.05}>
       <div className="space-y-6">
         <Typography variant="h3">Playlists & Saved</Typography>
         <ScrollRow>
@@ -143,9 +149,11 @@ export default function LibraryPage() {
             ))}
         </ScrollRow>
       </div>
+      </FadeIn>
 
       {/* Saved Albums */}
       {(savedAlbums.length > 0 || loadingSavedAlbums) && (
+        <FadeIn delay={0.1}>
         <div className="space-y-6">
           <Typography variant="h3">Saved Albums</Typography>
           <ScrollRow>
@@ -187,10 +195,12 @@ export default function LibraryPage() {
               ))}
           </ScrollRow>
         </div>
+        </FadeIn>
       )}
 
       {/* Liked Songs Track List */}
       {likedTracks.length > 0 && (
+        <FadeIn delay={0.15}>
         <div className="space-y-6">
           <Typography variant="h3">Liked Songs</Typography>
           <div className="space-y-1">
@@ -206,15 +216,19 @@ export default function LibraryPage() {
             ))}
           </div>
         </div>
+        </FadeIn>
       )}
 
       {!loadingLibrary && likedTracks.length === 0 && userPlaylists.length === 0 && savedAlbums.length === 0 && (
+        <FadeIn>
         <div className="py-12 text-center">
           <Typography variant="body" color="muted">
             Your library is empty. Start exploring and liking tracks!
           </Typography>
         </div>
+        </FadeIn>
       )}
     </div>
+    </PageTransition>
   );
 }

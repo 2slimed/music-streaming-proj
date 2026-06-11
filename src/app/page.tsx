@@ -7,6 +7,8 @@ import { api } from "@/lib/api";
 import { Play } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn, StaggerItem } from "@/components/ui/FadeIn";
 import type { Artist } from "@/types/api";
 
 const cardWidth = "w-[45%] sm:w-[30%] md:w-[22%] lg:w-[18%] xl:w-[14%]";
@@ -33,9 +35,11 @@ export default function HomePage() {
   const recentAlbums = recentAlbumsData?.data ?? [];
 
   return (
+    <PageTransition>
     <div className="w-full">
       <div className="p-6 md:p-10 space-y-12">
         {/* Recent Releases */}
+        <FadeIn>
         <section className="space-y-6">
           <Typography variant="h2">Recent Releases</Typography>
           {loadingRecent ? (
@@ -52,11 +56,11 @@ export default function HomePage() {
             <Typography variant="body" color="muted">No recent releases</Typography>
           ) : (
             <ScrollRow>
-              {recentAlbums.map((album) => (
+              {recentAlbums.map((album, i) => (
+                <StaggerItem key={album.id} className={`shrink-0 ${cardWidth}`}>
                 <Link
                   href={`/album/${encodeURIComponent(album.name)}`}
-                  key={album.id}
-                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]`}
+                  className="space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
                 >
                   <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
                     {album.coverUrl ? (
@@ -94,12 +98,15 @@ export default function HomePage() {
                     </Typography>
                   </div>
                 </Link>
+                </StaggerItem>
               ))}
             </ScrollRow>
           )}
         </section>
+        </FadeIn>
 
         {/* Popular Albums */}
+        <FadeIn delay={0.1}>
         <section className="space-y-6">
           <Typography variant="h2">Popular Albums</Typography>
           {loadingPopular ? (
@@ -114,11 +121,11 @@ export default function HomePage() {
             </div>
           ) : (
             <ScrollRow>
-              {popularAlbums.map((album) => (
+              {popularAlbums.map((album, i) => (
+                <StaggerItem key={album.id} className={`shrink-0 ${cardWidth}`}>
                 <Link
                   href={`/album/${encodeURIComponent(album.name)}`}
-                  key={album.id}
-                  className={`shrink-0 ${cardWidth} space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]`}
+                  className="space-y-2 cursor-pointer group transition-transform duration-200 hover:scale-[1.03]"
                 >
                   <div className="aspect-square rounded-xl bg-surface overflow-hidden relative shadow-lg">
                     {album.coverUrl ? (
@@ -156,12 +163,15 @@ export default function HomePage() {
                     </Typography>
                   </div>
                 </Link>
+                </StaggerItem>
               ))}
             </ScrollRow>
           )}
         </section>
+        </FadeIn>
 
         {/* Discover Artists */}
+        <FadeIn delay={0.2}>
         <section className="space-y-6">
           <Typography variant="h2">Discover Artists</Typography>
           {loadingArtists ? (
@@ -177,11 +187,11 @@ export default function HomePage() {
             <Typography variant="body" color="muted">No artists found</Typography>
           ) : (
             <ScrollRow>
-              {artists.map((artist: Artist) => (
+              {artists.map((artist: Artist, i: number) => (
+                <StaggerItem key={artist.id} className="shrink-0">
                 <Link
                   href={`/artist/${encodeURIComponent(artist.name)}`}
-                  key={artist.id}
-                  className="flex flex-col items-center gap-3 shrink-0 group transition-transform duration-200 hover:scale-[1.03]"
+                  className="flex flex-col items-center gap-3 group transition-transform duration-200 hover:scale-[1.03]"
                 >
                   <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-lg bg-surface">
                     {artist.imageUrl ? (
@@ -210,11 +220,14 @@ export default function HomePage() {
                     </Typography>
                   </div>
                 </Link>
+                </StaggerItem>
               ))}
             </ScrollRow>
           )}
         </section>
+        </FadeIn>
       </div>
     </div>
+    </PageTransition>
   );
 }

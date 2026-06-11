@@ -29,6 +29,9 @@ export async function POST(
     if (!track) {
       return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
+    if (track.moderationStatus !== "APPROVED") {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
 
     const playlist = await prisma.playlist.findUnique({ where: { id } });
     if (!playlist) {

@@ -1,3 +1,6 @@
+export type UserRole = "LISTENER" | "ARTIST" | "ADMIN";
+export type ModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
 export interface Track {
   id: string;
   trackId: string;
@@ -17,6 +20,9 @@ export interface Track {
   externalId: string | null;
   previewUrl: string | null;
   coverUrl: string | null;
+  moderationStatus: ModerationStatus;
+  submittedById: string | null;
+  artistOwnerId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +84,7 @@ export interface UserProfile {
   name: string | null;
   email: string | null;
   image: string | null;
+  role: UserRole;
   createdAt: string;
   _count: {
     playlists: number;
@@ -103,6 +110,53 @@ export interface Artist {
   nbAlbum: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ArtistClaim {
+  id: string;
+  userId: string;
+  artistId: string;
+  status: ModerationStatus;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+  artist: Artist;
+  user?: PlaylistUser & { email: string | null; role: UserRole };
+}
+
+export interface ArtistStudioSummary {
+  claims: ArtistClaim[];
+  approvedArtists: Artist[];
+  stats: {
+    tracks: number;
+    likes: number;
+    playlistAdds: number;
+    pendingTracks: number;
+    averagePopularity: number;
+  };
+}
+
+export interface AdminSummary {
+  users: number;
+  artists: number;
+  tracks: number;
+  playlists: number;
+  pendingArtistClaims: number;
+  pendingTrackSubmissions: number;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  role: UserRole;
+  createdAt: string;
+  _count?: {
+    playlists: number;
+    libraryItems: number;
+    artistClaims: number;
+  };
 }
 
 export interface SavedAlbum {

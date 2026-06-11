@@ -6,6 +6,8 @@ import { useSession } from "next-auth/react";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { TrackListItem } from "@/components/ui/TrackListItem";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { Play, Bookmark, Clock } from "lucide-react";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useRouter } from "next/navigation";
@@ -131,8 +133,10 @@ export default function AlbumPage({
   }
 
   return (
+    <PageTransition>
     <div className="space-y-8 pb-10">
       {/* Album Header Block */}
+      <FadeIn>
       <div className="w-full h-[400px] relative overflow-hidden flex items-start md:items-end p-6 md:p-10">
         {coverUrl && (
           <div
@@ -193,8 +197,10 @@ export default function AlbumPage({
           </div>
         </div>
       </div>
+      </FadeIn>
 
       {/* Action Buttons */}
+      <FadeIn delay={0.05}>
       <div className="px-6 md:px-10 flex items-center gap-4">
         <Button
           variant="default"
@@ -225,8 +231,10 @@ export default function AlbumPage({
           )}
         </Button>
       </div>
+      </FadeIn>
 
       {/* Track List */}
+      <FadeIn delay={0.1}>
       <div className="px-6 md:px-10">
         <div className="w-full border-b border-white/5 pb-2 mb-4 flex px-4">
           <Typography variant="caption" color="muted" className="w-12">
@@ -264,6 +272,8 @@ export default function AlbumPage({
           </div>
         )}
       </div>
+      </FadeIn>
     </div>
+    </PageTransition>
   );
 }
