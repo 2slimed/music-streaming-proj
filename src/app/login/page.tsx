@@ -42,8 +42,8 @@ export default function LoginPage() {
   return (
     <PageTransition>
     <div className="flex items-center justify-center min-h-screen p-6">
-      <FadeIn>
-      <GlassWindow intensity="medium" className="w-full max-w-md p-8 space-y-8">
+      <FadeIn className="w-full max-w-md">
+      <GlassWindow intensity="medium" className="w-full p-8 space-y-8">
         <div className="text-center space-y-2">
           <Music2 className="w-10 h-10 text-accent mx-auto" />
           <Typography variant="h2">Welcome back</Typography>
