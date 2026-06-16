@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -9,14 +9,14 @@ import { User, Mail, Calendar, ListMusic, Heart } from "lucide-react";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { GlassWindow } from "@/components/ui/GlassWindow";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { api } from "@/lib/api";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [name, setName] = useState("");
-  const [image, setImage] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -31,12 +31,6 @@ export default function ProfilePage() {
     queryFn: () => api.profile.get(),
     enabled: !!session?.user,
   });
-
-  useEffect(() => {
-    if (!profile) return;
-    setName(profile.name ?? "");
-    setImage(profile.image ?? "");
-  }, [profile]);
 
   const updateMutation = useMutation({
     mutationFn: api.profile.update,
@@ -73,25 +67,22 @@ export default function ProfilePage() {
     },
   });
 
-  const joined = useMemo(() => {
-    if (!profile?.createdAt) return "";
-    return new Date(profile.createdAt).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }, [profile?.createdAt]);
-
-  const dirty =
-    !!profile && (name.trim() !== (profile.name ?? "") || image.trim() !== (profile.image ?? ""));
+  const joined = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : "";
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setFormError(null);
     setSaveMessage(null);
 
-    const trimmedName = name.trim();
-    const trimmedImage = image.trim();
+    const formData = new FormData(e.currentTarget);
+    const trimmedName = String(formData.get("name") ?? "").trim();
+    const trimmedImage = String(formData.get("image") ?? "").trim();
     if (!trimmedName) {
       setFormError("Name cannot be empty");
       return;
@@ -119,9 +110,13 @@ export default function ProfilePage() {
   if (!session?.user || !profile) return null;
 
   return (
+    <PageTransition>
     <div className="p-6 md:p-10 space-y-8">
+      <FadeIn>
       <Typography variant="h1">Profile</Typography>
+      </FadeIn>
 
+      <FadeIn delay={0.05}>
       <GlassWindow intensity="medium" className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center gap-6">
           {profile.image ? (
@@ -139,10 +134,15 @@ export default function ProfilePage() {
             <Typography variant="caption" color="muted" className="flex items-center gap-2">
               <Calendar className="w-4 h-4" /> Joined {joined}
             </Typography>
+            <Typography variant="caption" color="muted">
+              Role: {profile.role}
+            </Typography>
           </div>
         </div>
       </GlassWindow>
+      </FadeIn>
 
+      <FadeIn delay={0.1}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <GlassWindow intensity="light" className="p-5">
           <Typography variant="caption" color="muted" className="flex items-center gap-2">
@@ -157,7 +157,9 @@ export default function ProfilePage() {
           <Typography variant="h2">{profile._count.libraryItems}</Typography>
         </GlassWindow>
       </div>
+      </FadeIn>
 
+      <FadeIn delay={0.15}>
       <GlassWindow intensity="medium" className="p-6 md:p-8">
         <Typography variant="h3" className="mb-5">Edit Profile</Typography>
         <form onSubmit={onSubmit} className="space-y-4 max-w-2xl">
@@ -165,8 +167,8 @@ export default function ProfilePage() {
             <label htmlFor="name" className="block text-sm text-muted">Display Name</label>
             <input
               id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              name="name"
+              defaultValue={profile.name ?? ""}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
               placeholder="Your name"
               maxLength={100}
@@ -176,8 +178,8 @@ export default function ProfilePage() {
             <label htmlFor="image" className="block text-sm text-muted">Avatar Image URL (HTTPS)</label>
             <input
               id="image"
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
+              name="image"
+              defaultValue={profile.image ?? ""}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
               placeholder="https://example.com/avatar.jpg"
             />
@@ -186,11 +188,13 @@ export default function ProfilePage() {
           {formError && <Typography variant="caption" className="text-red-400">{formError}</Typography>}
           {saveMessage && <Typography variant="caption" className="text-emerald-400">{saveMessage}</Typography>}
 
-          <Button type="submit" disabled={!dirty || updateMutation.isPending}>
+          <Button type="submit" disabled={updateMutation.isPending}>
             {updateMutation.isPending ? "Saving..." : "Save Changes"}
           </Button>
         </form>
       </GlassWindow>
+      </FadeIn>
     </div>
+    </PageTransition>
   );
 }

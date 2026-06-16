@@ -7,6 +7,8 @@ import Link from "next/link";
 import { GlassWindow } from "@/components/ui/GlassWindow";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { Music2 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -52,8 +54,10 @@ export default function RegisterPage() {
   }
 
   return (
+    <PageTransition>
     <div className="flex items-center justify-center min-h-screen p-6">
-      <GlassWindow intensity="medium" className="w-full max-w-md p-8 space-y-8">
+      <FadeIn className="w-full max-w-md">
+      <GlassWindow intensity="medium" className="w-full p-8 space-y-8">
         <div className="text-center space-y-2">
           <Music2 className="w-10 h-10 text-accent mx-auto" />
           <Typography variant="h2">Create account</Typography>
@@ -136,6 +140,8 @@ export default function RegisterPage() {
           </Typography>
         </div>
       </GlassWindow>
+      </FadeIn>
     </div>
+    </PageTransition>
   );
 }

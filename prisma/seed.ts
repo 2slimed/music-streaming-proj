@@ -22,6 +22,7 @@
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcryptjs";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -303,6 +304,9 @@ async function main() {
 
   // ---- Phase 3: Seed Album table from track data ------------------------
   await seedAlbums();
+
+  // ---- Phase 4: Seed demo accounts for role-based demos ----------------
+  await seedDemoUsers();
 }
 
 /** Search Deezer for an artist by name and return metadata. */
@@ -396,6 +400,25 @@ async function seedArtists() {
   }
 
   console.log(`\nSeeded ${seeded} artists.`);
+}
+
+async function seedDemoUsers() {
+  const passwordHash = await bcrypt.hash("MelodyMix123!", 12);
+  const users = [
+    { name: "Demo Listener", email: "listener@melodymix.test", role: "LISTENER" as const },
+    { name: "Demo Artist", email: "artist@melodymix.test", role: "ARTIST" as const },
+    { name: "Demo Admin", email: "admin@melodymix.test", role: "ADMIN" as const },
+  ];
+
+  for (const user of users) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: { role: user.role },
+      create: { ...user, passwordHash },
+    });
+  }
+
+  console.log("\nSeeded demo users: listener@melodymix.test, artist@melodymix.test, admin@melodymix.test");
 }
 
 main()

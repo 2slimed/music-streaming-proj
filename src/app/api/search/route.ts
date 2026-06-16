@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       (type === "all" || type === "tracks")
         ? prisma.track.findMany({
             where: {
+              moderationStatus: "APPROVED",
               OR: [
                 { trackName: { contains: q, mode: "insensitive" } },
                 { artists: { contains: q, mode: "insensitive" } },

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const artist = searchParams.get("artist");
     const album = searchParams.get("album");
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { moderationStatus: "APPROVED" };
     if (artist) where.artists = { contains: artist, mode: "insensitive" };
     if (album) where.albumName = { contains: album, mode: "insensitive" };
 

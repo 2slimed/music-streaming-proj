@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Clock, Disc3, Play } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Typography } from "@/components/ui/Typography";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { api } from "@/lib/api";
 import { usePlayerStore } from "@/stores/playerStore";
 
@@ -53,7 +55,9 @@ export default function TrackPage({
   }
 
   return (
+    <PageTransition>
     <div className="space-y-8 pb-20">
+      <FadeIn>
       <div className="relative flex min-h-[22rem] w-full items-end overflow-hidden p-6 md:p-10">
         {track.coverUrl ? (
           <img
@@ -114,7 +118,9 @@ export default function TrackPage({
           </div>
         </div>
       </div>
+      </FadeIn>
 
+      <FadeIn delay={0.1}>
       <div className="px-6 md:px-10">
         <Button
           size="icon"
@@ -125,6 +131,8 @@ export default function TrackPage({
           <Play className="ml-1 h-6 w-6 fill-current" />
         </Button>
       </div>
+      </FadeIn>
     </div>
+    </PageTransition>
   );
 }

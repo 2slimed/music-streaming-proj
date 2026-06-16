@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
  * Query params:
  *   page  - page number (default 1)
  *   limit - items per page (default 20, max 100)
+ *   q     - optional artist name search
  */
 export async function GET(request: NextRequest) {
   try {
@@ -16,14 +17,19 @@ export async function GET(request: NextRequest) {
 
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 20));
+    const q = searchParams.get("q")?.trim();
+    const where = q
+      ? { name: { contains: q, mode: "insensitive" as const } }
+      : undefined;
 
     const [artists, total] = await Promise.all([
       prisma.artist.findMany({
+        where,
         orderBy: { nbFan: { sort: "desc", nulls: "last" } },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      prisma.artist.count(),
+      prisma.artist.count({ where }),
     ]);
 
     return NextResponse.json({

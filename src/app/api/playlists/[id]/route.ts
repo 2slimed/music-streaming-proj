@@ -19,6 +19,7 @@ export async function GET(
       include: {
         user: { select: { id: true, name: true, image: true } },
         tracks: {
+          where: { track: { moderationStatus: "APPROVED" } },
           include: { track: true },
           orderBy: { position: "asc" },
         },

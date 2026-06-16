@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 import { Typography } from "@/components/ui/Typography";
 import { Button } from "@/components/ui/Button";
 import { PlaylistModal } from "@/components/ui/PlaylistModal";
-import { Bot, PlayCircle, Library, Menu, Music2, Search, Plus, X, Disc3 } from "lucide-react";
+import { Bot, PlayCircle, Library, Menu, Music2, Search, Plus, X, Disc3, Mic2, ShieldCheck } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { api } from "@/lib/api";
 import type { Playlist, SavedAlbum } from "@/types/api";
@@ -92,6 +92,26 @@ export function Sidebar() {
             <Bot className="w-5 h-5 text-accent" /> Chatbot
           </Button>
         </Link>
+        {(session?.user?.role === "ARTIST" || session?.user?.role === "ADMIN") && (
+          <Link href="/artist-studio" onClick={() => setIsMobileOpen(false)}>
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-3 ${pathname.startsWith("/artist-studio") ? "bg-white/10" : ""}`}
+            >
+              <Mic2 className="w-5 h-5 text-accent" /> Artist Studio
+            </Button>
+          </Link>
+        )}
+        {session?.user?.role === "ADMIN" && (
+          <Link href="/admin" onClick={() => setIsMobileOpen(false)}>
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-3 ${pathname.startsWith("/admin") ? "bg-white/10" : ""}`}
+            >
+              <ShieldCheck className="w-5 h-5 text-accent" /> Admin
+            </Button>
+          </Link>
+        )}
 
         <div className="my-4 border-t border-white/5" />
 

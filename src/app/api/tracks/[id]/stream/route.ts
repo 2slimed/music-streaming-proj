@@ -55,6 +55,9 @@ export async function GET(
     if (!track) {
       return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
+    if (track.moderationStatus !== "APPROVED" && track.submittedById !== session.user.id) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
 
     // If no previewUrl stored yet, try to resolve via Deezer API
     let previewUrl = track.previewUrl;
